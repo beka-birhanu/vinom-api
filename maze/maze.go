@@ -17,6 +17,10 @@ import (
 	"strings"
 )
 
+const (
+	maxMazeDimenssion = 20
+)
+
 // CellPosition represents the position of a cell in the maze grid.
 type CellPosition struct {
 	Row int // Row index of the cell
@@ -38,7 +42,11 @@ type Maze struct {
 }
 
 // New initializes a new maze of the given dimensions and generates its layout.
-func New(width, height int) *Maze {
+func New(width, height int) (*Maze, error) {
+	if min(width, height) <= 0 || max(width, height) > maxMazeDimenssion {
+		return nil, fmt.Errorf("Invalid maze dimensions")
+	}
+
 	grid := make([][]Cell, height)
 	for i := range grid {
 		grid[i] = make([]Cell, width)
@@ -59,7 +67,7 @@ func New(width, height int) *Maze {
 		Grid:   grid,
 	}
 	maze.generateMaze()
-	return maze
+	return maze, nil
 }
 
 // randomCellPosition generates a random position within the maze.
