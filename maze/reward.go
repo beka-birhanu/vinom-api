@@ -80,4 +80,3 @@ func calcProb(p float32, cell CellPosition, mazeWidth, mazeHeight int) float32 {
 
 	return prob
 }
-
