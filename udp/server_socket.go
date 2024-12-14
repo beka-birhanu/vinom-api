@@ -19,7 +19,7 @@ type ClientRequestHandler func(uuid.UUID, byte, []byte)
 // ClientRegisterHandler is called when a client is registerd into a session after being authenticated.
 type ClientRegisterHandler func(uuid.UUID)
 
-type Option func(*ServerSocketManager)
+type ServerOption func(*ServerSocketManager)
 
 // Custom error types
 var (
@@ -83,8 +83,8 @@ type ServerSocketManager struct {
 	encoder                 Encoder               // An implementation of Encoder to encode and decode messages.
 	asymmCrypto             Asymmetric            // An implementation of asymmetric encryption.
 	symmCrypto              Symmetric             // An implementation of symmetric encryption.
-	clientRequestHandler    ClientRequestHandler  // Request handler function called when an authenticated client sends a request.
-	clientRegisterHandler   ClientRegisterHandler // Request handler function called when a client completes the DTLS handshake.
+	onCustomClientRequest   ClientRequestHandler  // Request handler function called when an authenticated client sends a request.
+	onClientRegister        ClientRegisterHandler // Request handler function called when a client completes the DTLS handshake.
 	clients                 map[string]*Client    // Map of clients indexed by their identifier.
 	clientsLock             sync.RWMutex          // Read-write lock for accessing the clients map.
 	garbageCollectionTicker *time.Ticker          // Client garbage collection ticker.
@@ -106,7 +106,7 @@ type ServerConfig struct {
 }
 
 // NewServerSocketManager initializes a new SocketManager instance with the given configuration and options
-func NewServerSocketManager(c ServerConfig, options ...Option) (*ServerSocketManager, error) {
+func NewServerSocketManager(c ServerConfig, options ...ServerOption) (*ServerSocketManager, error) {
 	conn, err := net.ListenUDP("udp", c.ListenAddr)
 	if err != nil {
 		return nil, err
@@ -159,8 +159,8 @@ func (s *ServerSocketManager) Serve() {
 	// If heartbeatExpiration is provided spawn garbage collection routine
 	if s.heartbeatExpiration > 0 {
 		if s.garbageCollectionTicker != nil {
-			s.garbageCollectionTicker.Stop()
 			s.garbageCollectionStop <- true
+			s.garbageCollectionTicker.Stop()
 		}
 		s.garbageCollectionTicker = time.NewTicker(s.heartbeatExpiration)
 		s.garbageCollectionStop = make(chan bool, 1)
@@ -175,6 +175,7 @@ func (s *ServerSocketManager) Serve() {
 		s.logger.Println("error resetting connection deadline: ", err)
 	}
 	s.stop = make(chan bool, 1) // reset the stop channel
+	s.logger.Printf("server listening on udp address: %v", s.conn.LocalAddr().String())
 	for {
 		select {
 		case <-s.stop:
@@ -190,7 +191,7 @@ func (s *ServerSocketManager) Serve() {
 				s.logger.Printf("error while reading from udp: %s", err)
 				continue
 			} else if n > s.readBufferSize {
-				s.logger.Println(ErrMaximumPayloadSizeLimit)
+				s.logger.Printf("error while reading from udp: %s", ErrMaximumPayloadSizeLimit)
 				continue
 			}
 			s.rawRecords <- rawRecord{
@@ -199,6 +200,17 @@ func (s *ServerSocketManager) Serve() {
 			}
 		}
 	}
+}
+func (s *ServerSocketManager) Stop() {
+	s.logger.Println("server stoping gracefuly")
+	defer s.logger.Println("server stoped")
+
+	s.conn.SetReadDeadline(time.Unix(0, 1))
+	s.stop <- true
+	s.garbageCollectionStop <- true
+	s.garbageCollectionTicker.Stop()
+	close(s.rawRecords)
+	s.wg.Wait()
 }
 
 // clientGarbageCollection continuously monitors the connected clients
@@ -362,7 +374,7 @@ func (s *ServerSocketManager) handleCustomRecord(r *record, addr *net.UDPAddr) {
 		return
 	}
 
-	s.clientRequestHandler(cl.ID, r.Type, body)
+	s.onCustomClientRequest(cl.ID, r.Type, body)
 }
 
 // sayHelloVerify generates and sends a HelloVerify record to the client.
@@ -445,6 +457,8 @@ func (s *ServerSocketManager) sayServerHello(addr *net.UDPAddr, h HandshakeRecor
 		s.logger.Printf("error while sending server hello: %s", err)
 		return
 	}
+
+	s.logger.Printf("accepted connection with client: %s", ID)
 }
 
 // registerClient generates a new session ID & registers an address with client ID & encryption key as a Client
@@ -466,7 +480,7 @@ func (s *ServerSocketManager) registerClient(addr *net.UDPAddr, ID uuid.UUID, eK
 	s.clients[string(cl.sessionID)] = cl
 	s.clientsLock.Unlock()
 
-	s.clientRegisterHandler(cl.ID)
+	s.onClientRegister(cl.ID)
 	return cl, nil
 }
 
@@ -558,36 +572,36 @@ func splitSessionIDAndBody(payload []byte, sIDLength int) ([]byte, []byte, error
 	return payload[:sIDLength], payload[sIDLength:], nil
 }
 
-// WithClientRequestHandler sets a callback function to handle custom record types received from the client
-func WithClientRequestHandler(f ClientRequestHandler) Option {
+// ServerWithClientRequestHandler sets a callback function to handle custom record types received from the client
+func ServerWithClientRequestHandler(f ClientRequestHandler) ServerOption {
 	return func(s *ServerSocketManager) {
-		s.clientRequestHandler = f
+		s.onCustomClientRequest = f
 	}
 }
 
-// WithClientRegisterHandler sets a callback function to handle client registration after the DTLS handshake
-func WithClientRegisterHandler(f ClientRegisterHandler) Option {
+// ServerWithClientRegisterHandler sets a callback function to handle client registration after the DTLS handshake
+func ServerWithClientRegisterHandler(f ClientRegisterHandler) ServerOption {
 	return func(s *ServerSocketManager) {
-		s.clientRegisterHandler = f
+		s.onClientRegister = f
 	}
 }
 
-// WithHeartbeatExpiration sets the server heartbeat expiration option
-func WithHeartbeatExpiration(t time.Duration) Option {
+// ServerWithHeartbeatExpiration sets the server heartbeat expiration option
+func ServerWithHeartbeatExpiration(t time.Duration) ServerOption {
 	return func(s *ServerSocketManager) {
 		s.heartbeatExpiration = t
 	}
 }
 
-// WithReadBufferSize sets the read buffer size option
-func WithReadBufferSize(i int) Option {
+// ServerWithReadBufferSize sets the read buffer size option
+func ServerWithReadBufferSize(i int) ServerOption {
 	return func(s *ServerSocketManager) {
 		s.readBufferSize = i
 	}
 }
 
-// WithLogger sets the logger
-func WithLogger(l *log.Logger) Option {
+// ServerWithLogger sets the logger
+func ServerWithLogger(l *log.Logger) ServerOption {
 	return func(s *ServerSocketManager) {
 		s.logger = l
 	}
