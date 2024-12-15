@@ -20,7 +20,7 @@ type RewardModel struct {
 // PopulateReward assigns rewards to maze cells based on the RewardModel.
 // The probability of assigning RewardTwo decreases as cells are closer
 // to the center of the maze.
-func PopulateReward(r RewardModel, m *Maze) error {
+func PopulateReward(r RewardModel, m *WillsonMaze) error {
 	if r.RewardTypeProb > 1 || r.RewardTypeProb < 0 || min(r.RewardOne, r.RewardTwo) < 0 {
 		return fmt.Errorf("Invalid RewardModel")
 	}

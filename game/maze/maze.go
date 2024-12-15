@@ -12,9 +12,12 @@ Utility functions enable neighbor detection, move validation, and ASCII visualiz
 package maze
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"strings"
+
+	"github.com/beka-birhanu/vinom-api/game"
 )
 
 const (
@@ -28,30 +31,19 @@ var (
 		"East":  {Row: 0, Col: 1},
 		"West":  {Row: 0, Col: -1},
 	}
+
+	ErrInvalidMove = errors.New("invalid move request")
 )
 
-// CellPosition represents the position of a cell in the maze grid.
-type CellPosition struct {
-	Row int // Row index of the cell
-	Col int // Column index of the cell
-}
-
-// Move represents a movement from one cell to another in a specific direction.
-type Move struct {
-	From      CellPosition // Starting cell
-	To        CellPosition // Destination cell
-	Direction string       // Direction of the move (North, South, East, West)
-}
-
-// Maze represents a rectangular maze consisting of cells with walls and optional rewards.
-type Maze struct {
+// WillsonMaze represents a rectangular maze consisting of cells with walls and optional rewards.
+type WillsonMaze struct {
 	Width  int       // Width of the maze (number of columns)
 	Height int       // Height of the maze (number of rows)
 	Grid   [][]*Cell // 2D grid of cells forming the maze
 }
 
 // New initializes a new maze of the given dimensions and generates its layout.
-func New(width, height int) (*Maze, error) {
+func New(width, height int) (*WillsonMaze, error) {
 	if min(width, height) <= 0 || max(width, height) > maxMazeDimenssion {
 		return nil, fmt.Errorf("Invalid maze dimensions")
 	}
@@ -70,7 +62,7 @@ func New(width, height int) (*Maze, error) {
 		}
 	}
 
-	maze := &Maze{
+	maze := &WillsonMaze{
 		Width:  width,
 		Height: height,
 		Grid:   grid,
@@ -80,12 +72,12 @@ func New(width, height int) (*Maze, error) {
 }
 
 // randomCellPosition generates a random position within the maze.
-func (m *Maze) randomCellPosition() CellPosition {
+func (m *WillsonMaze) randomCellPosition() CellPosition {
 	return CellPosition{Row: rand.Intn(m.Height), Col: rand.Intn(m.Width)}
 }
 
 // randomUnvisitedCellPosition selects a random position that has not been visited.
-func (m *Maze) randomUnvisitedCellPosition(visited map[string]struct{}) CellPosition {
+func (m *WillsonMaze) randomUnvisitedCellPosition(visited map[string]struct{}) CellPosition {
 	for {
 		pos := m.randomCellPosition()
 		key := fmt.Sprintf("%d,%d", pos.Row, pos.Col)
@@ -96,7 +88,7 @@ func (m *Maze) randomUnvisitedCellPosition(visited map[string]struct{}) CellPosi
 }
 
 // neighbors finds all valid moves from a given cell position.
-func (m *Maze) neighbors(pos CellPosition) []Move {
+func (m *WillsonMaze) neighbors(pos CellPosition) []Move {
 	var result []Move
 	for dir, delta := range Directions {
 		neighbor := CellPosition{Row: pos.Row + delta.Row, Col: pos.Col + delta.Col}
@@ -108,7 +100,7 @@ func (m *Maze) neighbors(pos CellPosition) []Move {
 }
 
 // openWall removes the wall between two adjacent cells in the specified direction.
-func (m *Maze) openWall(move Move) error {
+func (m *WillsonMaze) openWall(move Move) error {
 	switch move.Direction {
 	case "North":
 		m.Grid[move.From.Row][move.From.Col].NorthWall = false
@@ -128,7 +120,7 @@ func (m *Maze) openWall(move Move) error {
 }
 
 // randomWalk performs a random walk starting from an unvisited cell.
-func (m *Maze) randomWalk(visited map[string]struct{}) map[CellPosition]Move {
+func (m *WillsonMaze) randomWalk(visited map[string]struct{}) map[CellPosition]Move {
 	start := m.randomUnvisitedCellPosition(visited)
 	visits := make(map[CellPosition]Move)
 	cell := start
@@ -148,7 +140,7 @@ func (m *Maze) randomWalk(visited map[string]struct{}) map[CellPosition]Move {
 }
 
 // generateMaze creates a maze using a randomized algorithm.
-func (m *Maze) generateMaze() {
+func (m *WillsonMaze) generateMaze() {
 	visited := make(map[string]struct{})
 	start := m.randomCellPosition()
 	visited[fmt.Sprintf("%d,%d", start.Row, start.Col)] = struct{}{}
@@ -162,30 +154,48 @@ func (m *Maze) generateMaze() {
 }
 
 // IsValidMove checks if a move is valid (i.e., the connecting wall is down).
-func (m *Maze) IsValidMove(move Move) bool {
+func (m *WillsonMaze) IsValidMove(move game.Move) bool {
+	// Check if the move positions are within the maze bounds.
 	inBound := func(row, col int) bool {
 		return row >= 0 && row < m.Height && col >= 0 && col < m.Width
 	}
 
-	if !inBound(move.From.Row, move.From.Col) || !inBound(move.To.Row, move.To.Col) {
+	// Ensure both the starting and destination positions are valid.
+	if !inBound(move.GetFrom().GetRow(), move.GetFrom().GetCol()) || !inBound(move.GetTo().GetRow(), move.GetTo().GetCol()) {
 		return false
 	}
-	switch move.Direction {
+
+	// Check the walls based on the direction of the move.
+	switch move.GetDirection() {
 	case "North":
-		return !m.Grid[move.From.Row][move.From.Col].NorthWall && !m.Grid[move.To.Row][move.To.Col].SouthWall
+		return !m.Grid[move.GetFrom().GetRow()][move.GetFrom().GetCol()].NorthWall && !m.Grid[move.GetTo().GetRow()][move.GetTo().GetCol()].SouthWall
 	case "South":
-		return !m.Grid[move.From.Row][move.From.Col].SouthWall && !m.Grid[move.To.Row][move.To.Col].NorthWall
+		return !m.Grid[move.GetFrom().GetRow()][move.GetFrom().GetCol()].SouthWall && !m.Grid[move.GetTo().GetRow()][move.GetTo().GetCol()].NorthWall
 	case "East":
-		return !m.Grid[move.From.Row][move.From.Col].EastWall && !m.Grid[move.To.Row][move.To.Col].WestWall
+		return !m.Grid[move.GetFrom().GetRow()][move.GetFrom().GetCol()].EastWall && !m.Grid[move.GetTo().GetRow()][move.GetTo().GetCol()].WestWall
 	case "West":
-		return !m.Grid[move.From.Row][move.From.Col].WestWall && !m.Grid[move.To.Row][move.To.Col].EastWall
+		return !m.Grid[move.GetFrom().GetRow()][move.GetFrom().GetCol()].WestWall && !m.Grid[move.GetTo().GetRow()][move.GetTo().GetCol()].EastWall
 	default:
 		return false
 	}
 }
 
+// Move executes a move in the maze, returning the reward of the destination cell.
+func (m *WillsonMaze) Move(move game.Move) (int, error) {
+	// Check if the move is valid.
+	if !m.IsValidMove(move) {
+		return 0, ErrInvalidMove
+	}
+
+	// Get the reward of the destination cell and reset the reward.
+	reward := m.Grid[move.GetTo().GetRow()][move.GetTo().GetCol()].Reward
+	m.Grid[move.GetTo().GetRow()][move.GetTo().GetCol()].Reward = 0
+
+	return reward, nil
+}
+
 // String provides a textual representation of the maze.
-func (m *Maze) String() string {
+func (m *WillsonMaze) String() string {
 	var output string
 
 	// Top boundary
