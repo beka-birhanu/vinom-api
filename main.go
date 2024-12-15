@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/beka-birhanu/vinom-api/maze"
+	"github.com/beka-birhanu/vinom-api/game/maze"
 )
 
 func main() {
