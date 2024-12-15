@@ -85,7 +85,7 @@ type ServerSocketManager struct {
 	symmCrypto              Symmetric             // An implementation of symmetric encryption.
 	onCustomClientRequest   ClientRequestHandler  // Request handler function called when an authenticated client sends a request.
 	onClientRegister        ClientRegisterHandler // Request handler function called when a client completes the DTLS handshake.
-	clients                 map[string]*Client    // Map of clients indexed by their identifier.
+	clients                 map[uuid.UUID]*Client // Map of clients indexed by their identifier.
 	clientsLock             sync.RWMutex          // Read-write lock for accessing the clients map.
 	garbageCollectionTicker *time.Ticker          // Client garbage collection ticker.
 	garbageCollectionStop   chan bool             // Channel to signal stopping the client garbage collector.
@@ -115,7 +115,7 @@ func NewServerSocketManager(c ServerConfig, options ...ServerOption) (*ServerSoc
 	s := &ServerSocketManager{
 		conn: conn,
 
-		clients:     make(map[string]*Client),
+		clients:     make(map[uuid.UUID]*Client),
 		clientsLock: sync.RWMutex{},
 
 		garbageCollectionStop: make(chan bool, 1),
@@ -202,7 +202,7 @@ func (s *ServerSocketManager) Serve() {
 	}
 }
 func (s *ServerSocketManager) Stop() {
-	s.logger.Println("server stoping gracefuly")
+	s.logger.Println("server stoping gracefuly...")
 	defer s.logger.Println("server stoped")
 
 	s.conn.SetReadDeadline(time.Unix(0, 1))
@@ -224,7 +224,7 @@ func (s *ServerSocketManager) clientGarbageCollection() {
 			for _, c := range s.clients {
 				if time.Now().After(c.lastHeartbeat.Add(s.heartbeatExpiration)) {
 					s.clientsLock.Lock()
-					delete(s.clients, string(c.sessionID))
+					delete(s.clients, c.ID)
 					s.clientsLock.Unlock()
 				}
 			}
@@ -477,7 +477,7 @@ func (s *ServerSocketManager) registerClient(addr *net.UDPAddr, ID uuid.UUID, eK
 	}
 
 	s.clientsLock.Lock()
-	s.clients[string(cl.sessionID)] = cl
+	s.clients[ID] = cl
 	s.clientsLock.Unlock()
 
 	s.onClientRegister(cl.ID)
@@ -518,6 +518,18 @@ func (s *ServerSocketManager) BroadcastToClients(typ byte, payload []byte) {
 			}
 		}(cl)
 	}
+}
+
+// sends a record byte array to the Client. the record type is prepended to the record body as a byte
+func (s *ServerSocketManager) SendToClient(clientID uuid.UUID, typ byte, payload []byte) error {
+	s.clientsLock.RLock()
+	client, found := s.clients[clientID]
+	if !found {
+		return ErrClientNotFound
+	}
+	s.clientsLock.RUnlock()
+
+	return s.sendToClient(client, typ, payload)
 }
 
 // sends a record byte array to the Client. the record type is prepended to the record body as a byte
