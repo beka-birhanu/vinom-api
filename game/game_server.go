@@ -104,7 +104,7 @@ func (g *Game) handleAction(t byte, move []byte) {
 	switch t {
 	case stateRequestActionType:
 		g.Wg.Add(1)
-		go g.broadcastState()
+		go g.broadcastState(false)
 	case moveActionType:
 		a, err := g.encoder.UnmarshalAction(move)
 		if err != nil {
@@ -118,20 +118,27 @@ func (g *Game) handleAction(t byte, move []byte) {
 func (g *Game) Stop() {
 	g.stop <- true
 	g.Wg.Wait()
-	close(g.StateChan)
-	close(g.EndChan)
 	close(g.ActionChan)
+	close(g.StateChan)
+	g.Wg.Add(1)
+	g.broadcastState(true)
+	close(g.EndChan)
 }
 
 // broadcastState sends the current game state to all players.
-func (g *Game) broadcastState() {
+func (g *Game) broadcastState(ended bool) {
 	defer g.Wg.Done()
 	gameState := g.snapshot()
 	gameStatePayload, err := g.encoder.MarshalGameState(gameState)
 	if err != nil {
 		return
 	}
-	g.StateChan <- gameStatePayload
+
+	if ended {
+		g.EndChan <- gameStatePayload
+	} else {
+		g.StateChan <- gameStatePayload
+	}
 }
 
 // snapshot creates a snapshot of the current game state.
@@ -167,7 +174,7 @@ func (g *Game) handleIncomingMove(a Action) {
 	}
 
 	reward, _ := g.maze.Move(move)
-	p.SetReward(p.GetReward() + int32(reward))
+	p.SetReward(p.GetReward() + reward)
 	g.version++
 	if g.maze.GetTotalReward() == 0 {
 		g.Unlock()
@@ -177,5 +184,5 @@ func (g *Game) handleIncomingMove(a Action) {
 	g.Unlock()
 
 	g.Wg.Add(1)
-	go g.broadcastState()
+	go g.broadcastState(false)
 }
