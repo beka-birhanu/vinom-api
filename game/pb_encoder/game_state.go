@@ -1,6 +1,8 @@
 package pb
 
-import "github.com/beka-birhanu/vinom-api/game"
+import (
+	"github.com/beka-birhanu/vinom-api/game"
+)
 
 var _ game.Maze = &Maze{}
 var _ game.GameState = &GameState{}
@@ -51,7 +53,7 @@ func (x *Maze) RemoveReward(pos game.CellPosition) error {
 func (x *Maze) RetriveGrid() [][]game.Cell {
 	maze := make([][]game.Cell, 0)
 	for _, row := range x.Grid {
-		new_row := make([]game.Cell, len(row.Cells))
+		new_row := make([]game.Cell, 0)
 		for _, cell := range row.Cells {
 			new_row = append(new_row, cell)
 		}
@@ -84,7 +86,7 @@ func (x *GameState) RetriveMaze() game.Maze {
 
 // RetrivePlayers implements game.GameState.
 func (x *GameState) RetrivePlayers() []game.Player {
-	players := make([]game.Player, len(x.Players))
+	players := make([]game.Player, 0)
 	for _, p := range x.GetPlayers() {
 		players = append(players, p)
 	}
