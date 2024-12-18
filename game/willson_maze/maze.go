@@ -149,15 +149,15 @@ func (m *WillsonMaze) getDirection(pos1, pos2 game.CellPosition) string {
 	verticalDir := map[int32]string{-1: "South", 1: "North"}
 
 	if pos1.GetCol() != pos2.GetCol() && pos1.GetRow() != pos2.GetRow() {
-		return ""
+		return "Direction Not Allowed"
 	}
 
 	if pos1.GetCol() == pos2.GetCol() { // vertical move
 		delta := pos1.GetRow() - pos2.GetRow()
-		return horizontalDir[delta]
+		return verticalDir[delta]
 	} else {
 		delta := pos1.GetCol() - pos2.GetCol()
-		return verticalDir[delta]
+		return horizontalDir[delta]
 	}
 }
 
