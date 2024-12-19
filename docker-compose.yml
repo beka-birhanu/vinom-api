@@ -1,0 +1,75 @@
+services:
+  redis:
+    image: redis:7.4
+    container_name: vinom_redis
+    command: ["redis-server", "--appendonly", "no"]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - redis_network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis
+    ports:
+      - "8081:8081"
+    networks:
+      - redis_network
+    depends_on:
+      - redis
+
+  db:
+    image: mongo:8.0
+    container_name: vinom_db
+    healthcheck:
+      test: ["CMD","mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${DB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_PASS}
+    volumes:
+      - db_data:/data/db
+    networks:
+      - app_network
+
+  app:
+    build:
+      context: . 
+      dockerfile: Dockerfile
+      target: dev-stage
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_PORT: ${DB_PORT}
+    networks:
+      - redis_network
+      - app_network
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+
+networks:
+  redis_network:
+    driver: bridge
+  app_network:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
+
