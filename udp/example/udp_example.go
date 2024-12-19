@@ -107,7 +107,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 
-	for _ = range quit {
+	for range quit {
 		server.Stop()
 		client.Disconnect()
 		client2.Disconnect()
