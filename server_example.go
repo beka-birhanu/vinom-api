@@ -141,9 +141,15 @@ func main1() {
 
 	for {
 		select {
-		case val := <-gameServer.StateChan():
+		case val, ok := <-gameServer.StateChan():
+			if !ok {
+				break
+			}
 			server.BroadcastToClients(9, val)
-		case val := <-gameServer.EndChan():
+		case val, ok := <-gameServer.EndChan():
+			if !ok {
+				break
+			}
 			server.BroadcastToClients(10, val)
 			time.Sleep(time.Second)
 			return
