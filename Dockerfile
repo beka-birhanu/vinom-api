@@ -32,11 +32,6 @@ RUN apt-get update && apt-get install -y curl git && apt-get clean
 # Install air
 RUN go install github.com/air-verse/air@latest
 
-# Install dependencies
-COPY go.mod go.sum ./
-RUN go mod tidy
-
-
 # Copy the application files
 COPY . .
 
