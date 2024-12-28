@@ -12,5 +12,5 @@ type PlayerAuthenticator interface {
 
 type Authenticator interface {
 	Register(string, string) error
-	SignIn(string, string) (dmn.User, string, error)
+	SignIn(string, string) (*dmn.User, string, error)
 }
