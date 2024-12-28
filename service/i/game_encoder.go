@@ -55,6 +55,11 @@ type Maze interface {
 	RemoveReward(pos CellPosition) error
 	RetriveGrid() [][]Cell
 	SetGrid([][]Cell)
+	PopulateReward(r struct {
+		RewardOne      int32
+		RewardTwo      int32
+		RewardTypeProb float32
+	}) error
 }
 
 // Action represents an action performed in the game.
