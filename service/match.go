@@ -8,56 +8,46 @@ import (
 	"log"
 	"time"
 
+	"github.com/beka-birhanu/vinom-api/config"
 	"github.com/beka-birhanu/vinom-api/service/i"
 	"github.com/google/uuid"
 )
 
 const (
-	// Default prefix for Redis keys
-	defaultPrefix string = "matchmaker"
-	// Default maximum number of players per match
-	defaultMaxPlayer int64 = 2
-	// Default rank tolerance (maximum rank difference to match players)
-	defaultRankTolerance = 0
-	// Default latency tolerance (maximum latency difference to match players)
+	defaultPrefix           = "matchmaker"
+	defaultMaxPlayer        = 2
+	defaultRankTolerance    = 0
 	defaultLatencyTolerance = 0
-	// Format string for queue Redis keys
-	queueRankLatencyKeyFmt string = "%s:queue:rank_%d:latency_%d"
+	queueRankLatencyKeyFmt  = "%s:queue:rank_%d:latency_%d"
 )
 
-// Error definitions
 var (
 	ErrPlayerNotFoundInQueue = errors.New("player not found in queue")
 )
 
-// HandlerFunc is the function called when players are successfully matched
-type HandlerFunc func(IDs ...string)
+type handlerFunc func(IDs []uuid.UUID)
 
-// Player represents a player in the matchmaking system
-type Player struct {
-	ID      uuid.UUID // Unique identifier of the player
-	Rank    int       // Player's rank used for matchmaking
-	Latency uint      // Player's latency used for matchmaking
+type player struct {
+	ID      uuid.UUID
+	Rank    int
+	Latency uint
 }
 
-// Options represents configuration options for the matchmaker
 type Options struct {
-	Prefix           string      // Prefix for Redis queue keys
-	Handler          HandlerFunc // Function to call when players are matched
-	Logger           *log.Logger // Logger for debugging and operational logs
-	MaxPlayer        int64       // Maximum number of players per match
-	RankTolerance    int         // Maximum rank difference for matching
-	LatencyTolerance int         // Maximum latency difference for matching
+	Prefix           string
+	Handler          handlerFunc
+	Logger           *log.Logger
+	MaxPlayer        int64
+	RankTolerance    int
+	LatencyTolerance int
 }
 
-// Matchmaker manages matchmaking using a sorted queue
 type Matchmaker struct {
-	sortedQueue i.SortedQueue // Sorted queue implementation
-	opts        *Options      // Matchmaker configuration options
+	sortedQueue i.SortedQueue
+	opts        *Options
 }
 
-// NewMatchmaker initializes a new Matchmaker instance
-func NewMatchmaker(sortedQueue i.SortedQueue, opts *Options) (*Matchmaker, error) {
+func NewMatchmaker(sortedQueue i.SortedQueue, opts *Options) (i.Matchmaker, error) {
 	if opts == nil {
 		opts = &Options{
 			MaxPlayer: defaultMaxPlayer,
@@ -71,6 +61,10 @@ func NewMatchmaker(sortedQueue i.SortedQueue, opts *Options) (*Matchmaker, error
 
 	if opts.MaxPlayer <= 0 {
 		opts.MaxPlayer = defaultMaxPlayer
+	}
+
+	if opts.Prefix == "" {
+		opts.Prefix = defaultPrefix
 	}
 
 	if opts.RankTolerance < 0 {
@@ -87,66 +81,63 @@ func NewMatchmaker(sortedQueue i.SortedQueue, opts *Options) (*Matchmaker, error
 	}, nil
 }
 
-// PushToQueue adds a player to the matchmaking queue
 func (mm *Matchmaker) PushToQueue(ctx context.Context, id uuid.UUID, rank int, latency uint) error {
-	return mm.pushPlayerToQueue(ctx, &Player{
+	mm.opts.Logger.Printf("%s[INFO]%s Adding player to queue: ID=%s Rank=%d Latency=%d", config.LogInfoColor, config.LogColorReset, id, rank, latency)
+	return mm.pushPlayerToQueue(ctx, &player{
 		ID:      id,
 		Rank:    rank,
 		Latency: latency,
 	})
 }
 
-// pushPlayerToQueue enqueues a player into the matchmaking queue
-func (mm *Matchmaker) pushPlayerToQueue(ctx context.Context, player *Player) error {
-	// Use the current time as the score for sorting players in the queue
+func (mm *Matchmaker) pushPlayerToQueue(ctx context.Context, player *player) error {
 	score := float64(time.Now().UnixNano())
-	err := mm.sortedQueue.Enqueue(ctx, mm.queueKey(player.Rank, player.Latency), score, player.ID)
+	err := mm.sortedQueue.Enqueue(ctx, mm.queueKey(player.Rank, player.Latency), score, player.ID.String())
 	if err != nil {
+		mm.opts.Logger.Printf("%s[ERROR]%s Failed to enqueue player: %s", config.LogErrorColor, config.LogColorReset, err)
 		return err
 	}
 
-	// Attempt to match players asynchronously
+	mm.opts.Logger.Printf("%s[INFO]%s Player enqueued successfully: ID=%s", config.LogInfoColor, config.LogColorReset, player.ID)
 	go mm.match(ctx, player.Rank, player.Latency)
 	return nil
 }
 
-// match checks if enough players are available in the queue for a match
-// and calls the handler function if a match is found
 func (mm *Matchmaker) match(ctx context.Context, rank int, latency uint) {
 	queueKey := mm.queueKey(rank, latency)
-
 	qLen := mm.sortedQueue.Count(ctx, queueKey)
+
 	if qLen >= mm.opts.MaxPlayer {
 		rawPlayers, err := mm.sortedQueue.DequeTops(ctx, queueKey, mm.opts.MaxPlayer)
-
 		if err != nil {
-			mm.opts.Logger.Printf("error while obtaining match function lock: %s", err.Error())
+			mm.opts.Logger.Printf("%s[ERROR]%s Error obtaining match lock: %s", config.LogErrorColor, config.LogColorReset, err)
 			return
 		}
-		var playersIDs []string
 
-		// Convert the raw player data into a list of string IDs
+		var playersIDs []uuid.UUID
 		for _, raw := range rawPlayers {
-			if id, ok := raw.(string); ok {
+			if id, err := uuid.Parse(raw); err == nil {
 				playersIDs = append(playersIDs, id)
 			} else {
-				fmt.Println("Error: non-string value found in queue")
+				mm.opts.Logger.Printf("%s[ERROR]%s Non-UUID value in queue: %s", config.LogErrorColor, config.LogColorReset, raw)
 			}
 		}
 
 		if mm.opts.Handler != nil {
-			go mm.opts.Handler(playersIDs...)
+			mm.opts.Logger.Printf("%s[INFO]%s Match found for players: %v", config.LogInfoColor, config.LogColorReset, playersIDs)
+			go mm.opts.Handler(playersIDs)
 		}
 	}
 }
 
-// queueKey generates the Redis queue key based on player rank and latency
+func (mm *Matchmaker) SetMatchHandler(f func([]uuid.UUID)) {
+	mm.opts.Handler = f
+}
+
 func (mm *Matchmaker) queueKey(rank int, latency uint) string {
-	// Scale rank and latency to based on tolerance
 	return fmt.Sprintf(queueRankLatencyKeyFmt, mm.opts.Prefix, scale(rank, mm.opts.RankTolerance), scale(int(latency), mm.opts.LatencyTolerance))
 }
 
-// scale adjusts a value based on the specified tolerance level
 func scale(value, tolerance int) int {
 	return value / (tolerance + 1)
 }
