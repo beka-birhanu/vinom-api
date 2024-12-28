@@ -1,4 +1,4 @@
-# Stage 1: Build the Go application
+# Stage prod-stage
 FROM golang:1.23.4 AS prod-stage 
 
 WORKDIR /app
@@ -13,15 +13,13 @@ COPY . .
 # Build the Go application
 RUN CGO_ENABLED=0 GOOS=linux go build -o /api ./main.go
 
-# Expose the application port
-EXPOSE 8080
 
 # Command to run the application binary
 ENTRYPOINT ["/api"]
 
 
 
-# Stage 2: Development environment with air
+# Stage dev-stage: Development environment with air
 FROM golang:1.23.4 AS dev-stage
 
 WORKDIR /app
@@ -34,9 +32,6 @@ RUN go install github.com/air-verse/air@latest
 
 # Copy the application files
 COPY . .
-
-# Expose the application port
-EXPOSE 8080
 
 # Command to run air for development
 CMD ["air", "-c", ".air.toml"]
