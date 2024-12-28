@@ -60,6 +60,15 @@ func (x *Maze) RetriveGrid() [][]i.Cell {
 	return maze
 }
 
+// PopulateReward implements i.Maze.
+func (x *Maze) PopulateReward(r struct {
+	RewardOne      int32
+	RewardTwo      int32
+	RewardTypeProb float32
+}) error {
+	panic("unimplemented")
+}
+
 // SetGrid implements game.Maze.
 func (x *Maze) SetGrid(g [][]i.Cell) {
 	maze := make([]*Maze_Row, 0)

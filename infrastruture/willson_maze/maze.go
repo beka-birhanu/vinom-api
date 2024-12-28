@@ -86,7 +86,7 @@ func (m *WillsonMaze) SetGrid(g [][]i.Cell) {
 }
 
 // New initializes a new maze with the given dimensions and generates its layout.
-func New(width, height int) (*WillsonMaze, error) {
+func New(width, height int) (i.Maze, error) {
 	if min(width, height) <= 0 || max(width, height) > maxMazeDimenssion {
 		return nil, fmt.Errorf("invalid maze dimensions")
 	}

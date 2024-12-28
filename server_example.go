@@ -19,15 +19,20 @@ import (
 	"github.com/google/uuid"
 )
 
-type a struct{}
+type a1 struct{}
 
-func (a *a) Authenticate(s []byte) (uuid.UUID, error) {
+func (a *a1) Authenticate(s []byte) (uuid.UUID, error) {
 	return uuid.FromBytes(s)
 }
 
 func main1() {
 	maz, _ := maze.New(10, 10)
-	if maze.PopulateReward(maze.RewardModel{RewardOne: 1, RewardTwo: 5, RewardTypeProb: 0.9}, maz) != nil {
+
+	if maz.PopulateReward(struct {
+		RewardOne      int32
+		RewardTwo      int32
+		RewardTypeProb float32
+	}{RewardOne: 1, RewardTwo: 5, RewardTypeProb: 0.9}) != nil {
 		return
 	}
 
@@ -68,7 +73,7 @@ func main1() {
 	rsaEnc := crypto.NewRSA(asymm)
 	server, _ := udp.NewServerSocketManager(udp.ServerConfig{
 		ListenAddr:    serverAddr,
-		Authenticator: &a{},
+		Authenticator: &a1{},
 		AsymmCrypto:   rsaEnc,
 		SymmCrypto:    crypto.NewAESCBC(),
 		Encoder:       &udppb.Protobuf{},
@@ -94,8 +99,8 @@ func main1() {
 			AuthToken:          p1[:],
 			OnConnectionSucces: func() {},
 			OnServerResponse: func(t byte, message []byte) {
-				// m, _ := game_encoder.UnmarshalGameState(message)
-				// fmt.Printf("\n#Client Socket One#------#server responeded with: %v, %v", t, m)
+				m, _ := game_encoder.UnmarshalGameState(message)
+				fmt.Printf("\n#Client Socket One#------#server responeded with: %v, %v", t, m)
 			},
 			OnPingResult: func(i int64) {},
 		},
@@ -145,12 +150,12 @@ func main1() {
 			if !ok {
 				break
 			}
-			server.BroadcastToClients(9, val)
+			server.BroadcastToClients([]uuid.UUID{player1.GetID()}, 9, val)
 		case val, ok := <-gameServer.EndChan():
 			if !ok {
 				break
 			}
-			server.BroadcastToClients(10, val)
+			server.BroadcastToClients([]uuid.UUID{player1.GetID(), player2.GetID()}, 10, val)
 			time.Sleep(time.Second)
 			return
 			// default:
