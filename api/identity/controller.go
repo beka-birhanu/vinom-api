@@ -5,7 +5,6 @@ import (
 
 	"github.com/beka-birhanu/vinom-api/service/i"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // IdentityServer handles HTTP requests related to authentication.
@@ -13,17 +12,11 @@ type IdentityServer struct {
 	authService i.Authenticator
 }
 
-// IdentityServerConfig contains configuration options for IdentityServer.
-type IdentityServerConfig struct {
-	MongoClient *mongo.Client
-	DBName      string
-	JWTSecret   string
-	JWTIssuer   string
-}
-
 // NewIdentityServer creates a new AuthServer.
-func NewIdentityServer(config IdentityServerConfig) *IdentityServer {
-	return &IdentityServer{}
+func NewIdentityServer(a i.Authenticator) *IdentityServer {
+	return &IdentityServer{
+		authService: a,
+	}
 }
 
 // RegisterPublic registers public routes.
@@ -35,8 +28,8 @@ func (c *IdentityServer) RegisterPublic(route *gin.RouterGroup) {
 	}
 }
 
-// RegisterPrivileged registers privileged routes.
-func (c *IdentityServer) RegisterPrivileged(route *gin.RouterGroup) {
+// RegisterProtected registers privileged routes.
+func (c *IdentityServer) RegisterProtected(route *gin.RouterGroup) {
 }
 
 // registerUser handles user registration.
