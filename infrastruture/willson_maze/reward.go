@@ -40,11 +40,11 @@ func (m *WillsonMaze) PopulateReward(r struct {
 		totalRewardPlaced += reward
 
 		// Explore neighbors and push unvisited ones onto the stack
-		for _, nbr := range m.neighbors(cell) {
-			key := fmt.Sprintf("%d,%d", nbr.to.GetRow(), nbr.to.GetCol())
+		for _, nbr := range m.inBoundMoves(cell) {
+			key := fmt.Sprintf("%d,%d", nbr.To().GetRow(), nbr.To().GetCol())
 			if _, seen := visited[key]; !seen {
 				visited[key] = struct{}{}
-				stack = append(stack, nbr.to)
+				stack = append(stack, nbr.To())
 			}
 		}
 	}

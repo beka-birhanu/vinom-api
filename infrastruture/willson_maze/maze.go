@@ -14,7 +14,9 @@ package maze
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand"
+	"slices"
 	"strings"
 
 	"github.com/beka-birhanu/vinom-api/service/i"
@@ -44,45 +46,6 @@ type WillsonMaze struct {
 	height     int        // The number of rows in the maze.
 	grid       [][]i.Cell // The 2D grid of cells that form the maze.
 	totalRward int32      // total reward in the maze.
-}
-
-// GetTotalReward implements game.Maze.
-func (m *WillsonMaze) GetTotalReward() int32 {
-	return m.totalRward
-}
-
-// NewValidMove implements game.Maze.
-func (m *WillsonMaze) NewValidMove(curPos i.CellPosition, dir string) (i.Move, error) {
-	delta, ok := Directions[dir]
-	if !ok {
-		return nil, errors.New("invalid direction")
-	}
-
-	nextPos := &CellPosition{
-		row: curPos.GetRow() + delta.row,
-		col: curPos.GetCol() + delta.col,
-	}
-
-	move := &Move{
-		from: curPos,
-		to:   nextPos,
-	}
-
-	if !m.IsValidMove(move) {
-		return nil, errors.New("invalid move")
-	}
-
-	return move, nil
-}
-
-// RetriveGrid returns the 2D grid of cells that make up the maze (implements game.Maze).
-func (m *WillsonMaze) RetriveGrid() [][]i.Cell {
-	return m.grid
-}
-
-// SetGrid sets the 2D grid of cells for the maze (implements game.Maze).
-func (m *WillsonMaze) SetGrid(g [][]i.Cell) {
-	m.grid = g
 }
 
 // New initializes a new maze with the given dimensions and generates its layout.
@@ -131,13 +94,13 @@ func (m *WillsonMaze) randomUnvisitedCellPosition(visited map[string]struct{}) i
 	}
 }
 
-// neighbors returns all valid neighboring positions and the moves required to reach them.
-func (m *WillsonMaze) neighbors(pos i.CellPosition) []Move {
-	var result []Move
+// inBoundMoves returns all valid neighboring positions and the moves required to reach them.
+func (m *WillsonMaze) inBoundMoves(pos i.CellPosition) []i.Move {
+	var result []i.Move
 	for _, delta := range Directions {
 		neighbor := &CellPosition{row: pos.GetRow() + delta.row, col: pos.GetCol() + delta.col}
-		if neighbor.GetRow() >= 0 && neighbor.GetRow() < int32(m.height) && neighbor.GetCol() >= 0 && neighbor.GetCol() < int32(m.width) {
-			result = append(result, Move{from: pos, to: neighbor})
+		if m.InBound(int(neighbor.row), int(neighbor.col)) {
+			result = append(result, &Move{from: pos, to: neighbor})
 		}
 	}
 	return result
@@ -162,43 +125,44 @@ func (m *WillsonMaze) getDirection(pos1, pos2 i.CellPosition) string {
 }
 
 // openWall removes the wall between two adjacent cells in the specified direction.
-func (m *WillsonMaze) openWall(move Move) error {
-	dir := m.getDirection(move.from, move.to)
+func (m *WillsonMaze) openWall(move i.Move) error {
+	dir := m.getDirection(move.From(), move.To())
 	switch dir {
 	case "North":
-		m.grid[move.from.GetRow()][move.from.GetCol()].SetNorthWall(false)
-		m.grid[move.to.GetRow()][move.to.GetCol()].SetSouthWall(false)
+		m.grid[move.From().GetRow()][move.From().GetCol()].SetNorthWall(false)
+		m.grid[move.To().GetRow()][move.To().GetCol()].SetSouthWall(false)
 	case "South":
-		m.grid[move.from.GetRow()][move.from.GetCol()].SetSouthWall(false)
-		m.grid[move.to.GetRow()][move.to.GetCol()].SetNorthWall(false)
+		m.grid[move.From().GetRow()][move.From().GetCol()].SetSouthWall(false)
+		m.grid[move.To().GetRow()][move.To().GetCol()].SetNorthWall(false)
 	case "East":
-		m.grid[move.from.GetRow()][move.from.GetCol()].SetEastWall(false)
-		m.grid[move.to.GetRow()][move.to.GetCol()].SetWestWall(false)
+		m.grid[move.From().GetRow()][move.From().GetCol()].SetEastWall(false)
+		m.grid[move.To().GetRow()][move.To().GetCol()].SetWestWall(false)
 	case "West":
-		m.grid[move.from.GetRow()][move.from.GetCol()].SetWestWall(false)
-		m.grid[move.to.GetRow()][move.to.GetCol()].SetEastWall(false)
+		m.grid[move.From().GetRow()][move.From().GetCol()].SetWestWall(false)
+		m.grid[move.To().GetRow()][move.To().GetCol()].SetEastWall(false)
 	}
 	return nil
 }
 
 // randomWalk performs a random walk starting from an unvisited cell, recording moves taken.
-func (m *WillsonMaze) randomWalk(visited map[string]struct{}) map[i.CellPosition]Move {
+func (m *WillsonMaze) randomWalk(visited map[string]struct{}) []i.Move {
 	start := m.randomUnvisitedCellPosition(visited)
-	visits := make(map[i.CellPosition]Move)
+	visits := make(map[string]i.Move)
 	cell := start
 
 	for {
-		neighbors := m.neighbors(cell)
-		randomNeighbor := neighbors[rand.Intn(len(neighbors))]
-		visits[cell] = randomNeighbor
-		key := fmt.Sprintf("%d,%d", randomNeighbor.to.GetRow(), randomNeighbor.to.GetCol())
-		if _, included := visited[key]; included {
+		moves := m.inBoundMoves(cell)
+		randomNeighbor := moves[rand.Intn(len(moves))].To()
+		cellKey := fmt.Sprintf("%d,%d", cell.GetRow(), cell.GetCol())
+		visits[cellKey] = &Move{from: cell, to: randomNeighbor}
+		neighborKey := fmt.Sprintf("%d,%d", randomNeighbor.GetRow(), randomNeighbor.GetCol())
+		if _, included := visited[neighborKey]; included {
 			break
 		}
-		cell = randomNeighbor.to
+		cell = randomNeighbor
 	}
 
-	return visits
+	return slices.Collect(maps.Values(visits))
 }
 
 // generateMaze creates a maze using Wilson's algorithm.
@@ -208,9 +172,11 @@ func (m *WillsonMaze) generateMaze() {
 	visited[fmt.Sprintf("%d,%d", start.GetRow(), start.GetCol())] = struct{}{}
 
 	for len(visited) < m.width*m.height {
-		for cell, move := range m.randomWalk(visited) {
-			_ = m.openWall(move)
-			visited[fmt.Sprintf("%d,%d", cell.GetRow(), cell.GetCol())] = struct{}{}
+		for _, move := range m.randomWalk(visited) {
+			from := move.From()
+			to := move.To()
+			_ = m.openWall(&Move{from: from, to: to})
+			visited[fmt.Sprintf("%d,%d", from.GetRow(), from.GetCol())] = struct{}{}
 		}
 	}
 }
@@ -311,4 +277,43 @@ func (m *WillsonMaze) RemoveReward(pos i.CellPosition) error {
 	}
 	m.grid[pos.GetRow()][pos.GetCol()].SetReward(0)
 	return nil
+}
+
+// GetTotalReward implements game.Maze.
+func (m *WillsonMaze) GetTotalReward() int32 {
+	return m.totalRward
+}
+
+// NewValidMove implements game.Maze.
+func (m *WillsonMaze) NewValidMove(curPos i.CellPosition, dir string) (i.Move, error) {
+	delta, ok := Directions[dir]
+	if !ok {
+		return nil, errors.New("invalid direction")
+	}
+
+	nextPos := &CellPosition{
+		row: curPos.GetRow() + delta.row,
+		col: curPos.GetCol() + delta.col,
+	}
+
+	move := &Move{
+		from: curPos,
+		to:   nextPos,
+	}
+
+	if !m.IsValidMove(move) {
+		return nil, errors.New("invalid move")
+	}
+
+	return move, nil
+}
+
+// RetriveGrid returns the 2D grid of cells that make up the maze (implements game.Maze).
+func (m *WillsonMaze) RetriveGrid() [][]i.Cell {
+	return m.grid
+}
+
+// SetGrid sets the 2D grid of cells for the maze (implements game.Maze).
+func (m *WillsonMaze) SetGrid(g [][]i.Cell) {
+	m.grid = g
 }
