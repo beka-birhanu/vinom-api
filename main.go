@@ -93,7 +93,7 @@ func initUDPSocketManager() {
 		},
 		udp.ServerWithReadBufferSize(config.Envs.UDPBufferSize),
 		udp.ServerWithLogger(log.New(os.Stdout, fmt.Sprintf("%s[SERVER-SOCKET] %s", config.ColorBlue, config.LogColorReset), log.LstdFlags|log.Lmsgprefix)),
-		udp.ServerWithHeartbeatExpiration(time.Second),
+		udp.ServerWithHeartbeatExpiration(3*time.Second),
 	)
 	if err != nil {
 		log.Fatalf("%s[APP] [ERROR] Creating server UDP socket manager: %v%s", config.LogErrorColor, err, config.LogColorReset)
