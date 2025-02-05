@@ -76,7 +76,12 @@ func (mkc *MatchMakingController) matchInfo(ctx *gin.Context) {
 		return
 	}
 
-	pubKey, socketAddr := mkc.gameSessionManager.SessionInfo(ID)
+	pubKey, socketAddr, err := mkc.gameSessionManager.SessionInfo(ID)
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "No Session"})
+		return
+	}
+
 	response := &MatchInfoResponse{
 		SocketPubKey: pubKey,
 		SocketAddr:   socketAddr,
