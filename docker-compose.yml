@@ -12,19 +12,6 @@ services:
     networks:
       - redis_network
 
-  redis-commander:
-    image: rediscommander/redis-commander:latest
-    container_name: redis-commander
-    environment:
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
-    ports:
-      - "8081:8081"
-    networks:
-      - redis_network
-    depends_on:
-      - redis
-
   db:
     image: mongo:8.0
     container_name: vinom_db
@@ -46,14 +33,16 @@ services:
     build:
       context: . 
       dockerfile: Dockerfile
-      target: dev-stage
+      target: prod-stage
     container_name: vinom_app
     ports:
-      - "8080:8080"
+      - "${REST_PORT}:${REST_PORT}"
+      - "${UDP_PORT}:${UDP_PORT}/udp"
     volumes:
       - .:/app
       - /app/tmp 
     environment:
+      HOST_IP: app
       DB_HOST: ${DB_HOST}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
@@ -61,6 +50,15 @@ services:
       DB_NAME: ${DB_NAME}
       REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT}
+      GIN_MODE: ${GIN_MODE}
+      UDP_PORT: ${UDP_PORT}
+      UDP_BUFFER_SIZE: ${UDP_BUFFER_SIZE}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      REST_PORT: ${REST_PORT}
+      MAX_PLAYER: ${MAX_PLAYER}
+      RANK_TOLERANCE: ${RANK_TOLERANCE}
+      LATENCY_TOLERANCE: ${LATENCY_TOLERANCE}
     networks:
       - redis_network
       - db_network 
