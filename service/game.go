@@ -21,7 +21,7 @@ var (
 
 // Game constants for configuration and action types.
 const (
-	moveActionType         = 1 << iota // Action type for movement.
+	moveActionType         = 3 << iota // Action type for movement.
 	stateRequestActionType             // Action type for state requests.
 
 	minPlayers = 2 // Minimum number of players.
@@ -86,6 +86,7 @@ func NewGame(maze i.Maze, players []i.Player, e i.GameEncoder) (*Game, error) {
 // Start begins the game and listens for player actions or a timeout.
 func (g *Game) Start(gameDuration time.Duration) {
 	time.AfterFunc(gameDuration, g.Stop)
+	x := time.NewTicker(2 * time.Second)
 	for {
 		select {
 		case <-g.stop:
@@ -96,6 +97,9 @@ func (g *Game) Start(gameDuration time.Duration) {
 				continue
 			}
 			g.handleAction(action[0], action[1:])
+		case <-x.C:
+			g.Wg.Add(1)
+			g.broadcastState(false)
 		}
 	}
 }
@@ -160,11 +164,13 @@ func (g *Game) handleIncomingMove(a i.Action) {
 	g.Lock()
 	p, ok := g.players[a.GetID()]
 	if !ok {
+		g.Unlock()
 		return
 	}
 
 	curPosition := p.RetrivePos()
 	if curPosition.GetRow() != a.RetriveFrom().GetRow() || curPosition.GetCol() != a.RetriveFrom().GetCol() {
+		g.Unlock()
 		return
 	}
 
@@ -176,6 +182,8 @@ func (g *Game) handleIncomingMove(a i.Action) {
 
 	reward, _ := g.maze.Move(move)
 	p.SetReward(p.GetReward() + reward)
+	p.SetPos(move.To())
+
 	g.version++
 	if g.maze.GetTotalReward() == 0 {
 		g.Unlock()
