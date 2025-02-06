@@ -205,7 +205,7 @@ func (s *ServerSocketManager) Stop() {
 	s.logger.Println("server stoping gracefuly...")
 	defer s.logger.Println("server stoped")
 
-	s.conn.SetReadDeadline(time.Unix(0, 1))
+	_ = s.conn.SetReadDeadline(time.Unix(0, 1))
 	s.stop <- true
 	s.garbageCollectionStop <- true
 	s.garbageCollectionTicker.Stop()
@@ -374,7 +374,7 @@ func (s *ServerSocketManager) handleCustomRecord(r *record, addr *net.UDPAddr) {
 		return
 	}
 
-	s.onCustomClientRequest(cl.ID, r.Type, body)
+	go s.onCustomClientRequest(cl.ID, r.Type, body)
 }
 
 // sayHelloVerify generates and sends a HelloVerify record to the client.
