@@ -11,6 +11,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v8"
+	"github.com/google/uuid"
 )
 
 const (
@@ -38,7 +39,7 @@ var (
 type HandlerFunc func(rank int, latency uint, IDs ...string)
 
 type Player struct {
-	ID      string
+	ID      uuid.UUID
 	Rank    int
 	Latency uint
 }
@@ -110,22 +111,8 @@ func NewMatchmaker(client *redis.Client, opts *Options) (*RedisMatchmaker, error
 	return matchmaker, nil
 }
 
-// GetScore returns the player queue score with the id, rank & latency
-func (rm *RedisMatchmaker) GetScore(ctx context.Context, id string, rank int, latency uint) (int64, error) {
-	res := rm.client.ZRank(ctx, rm.queueKey(rank, latency), id)
-	score, err := res.Result()
-	if err != nil {
-		if err == redis.Nil {
-			return 0, ErrPlayerNotFoundInQueue
-		} else {
-			return 0, err
-		}
-	}
-	return score, nil
-}
-
 // PushToQueue pushes a player to the queue
-func (rm *RedisMatchmaker) PushToQueue(ctx context.Context, id string, rank int, latency uint) error {
+func (rm *RedisMatchmaker) PushToQueue(ctx context.Context, id uuid.UUID, rank int, latency uint) error {
 	return rm.pushPlayerToQueue(ctx, &Player{
 		id,
 		rank,
