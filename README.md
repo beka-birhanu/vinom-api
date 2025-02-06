@@ -1,5 +1,4 @@
 # Vinom  
-![logo](./assets/logo/logo.webp)
 
 Vinom is a secure and scalable system designed for managing real-time communication and game matchmaking. It implements a secure protocol using DTLS and provides robust architecture for authentication, user management, and game server communication.  
 
@@ -31,13 +30,6 @@ Vinom is a secure and scalable system designed for managing real-time communicat
 - **Redis**: For matchmaking and session management.  
 - **PostgreSQL**: For persistent data storage.  
 - **Docker & Kubernetes**: For containerization and deployment.  
-
-## System Architecture Draft
-![draft image](./assets/system-design-draft.png)
-
-
-
-
 ---
 
 ![goofer](./assets/logo/gopher-dance-long-3x.gif)
