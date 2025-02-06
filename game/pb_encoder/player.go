@@ -17,7 +17,7 @@ func playerFromInterface(player game.Player) *Player {
 
 // GetID implements game.Player.
 func (x *Player) GetID() uuid.UUID {
-	id, _ := uuid.FromBytes([]byte(x.Id))
+	id, _ := uuid.Parse(x.Id)
 	return id
 }
 
@@ -33,7 +33,7 @@ func (x *Player) SetID(i uuid.UUID) {
 
 // SetPos implements game.Player.
 func (x *Player) SetPos(p game.CellPosition) {
-	x.Pos = cellPositionInterface(x.Pos)
+	x.Pos = cellPositionInterface(p)
 }
 
 // SetReward implements game.Player.
