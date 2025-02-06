@@ -1,11 +1,12 @@
-package matchmaker
+package sortedstorage
 
 import (
 	"context"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/beka-birhanu/vinom-api/service/i"
 	"github.com/go-redsync/redsync/v4"
-	"github.com/go-redsync/redsync/v4/redis/goredis/v8"
+	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
+	"github.com/redis/go-redis/v9"
 )
 
 // RedisSortedQueue manages a sorted queue in Redis.
@@ -15,7 +16,7 @@ type RedisSortedQueue struct {
 }
 
 // NewRedisSortedQueue initializes a RedisSortedQueue with the provided Redis client.
-func NewRedisSortedQueue(client *redis.Client) (*RedisSortedQueue, error) {
+func NewRedisSortedQueue(client *redis.Client) (i.SortedQueue, error) {
 	queue := &RedisSortedQueue{client: client}
 	pool := goredis.NewPool(client)
 	queue.locker = redsync.New(pool)
@@ -23,13 +24,13 @@ func NewRedisSortedQueue(client *redis.Client) (*RedisSortedQueue, error) {
 }
 
 // Enqueue adds a member to the sorted queue with a given score.
-func (rsq *RedisSortedQueue) Enqueue(ctx context.Context, queueKey string, score float64, member interface{}) error {
-	_, err := rsq.client.ZAdd(ctx, queueKey, &redis.Z{Score: score, Member: member}).Result()
+func (rsq *RedisSortedQueue) Enqueue(ctx context.Context, queueKey string, score float64, member string) error {
+	_, err := rsq.client.ZAdd(ctx, queueKey, redis.Z{Score: score, Member: member}).Result()
 	return err
 }
 
-// DequeTop removes and retrieves up to `amount` members with the lowest scores.
-func (rsq *RedisSortedQueue) DequeTop(ctx context.Context, queueKey string, amount int64) ([]interface{}, error) {
+// DequeTops removes and retrieves up to `amount` members with the lowest scores.
+func (rsq *RedisSortedQueue) DequeTops(ctx context.Context, queueKey string, amount int64) ([]string, error) {
 	mutex := rsq.locker.NewMutex(queueKey + ":match_lock")
 	if err := mutex.Lock(); err != nil {
 		return nil, err
@@ -38,10 +39,10 @@ func (rsq *RedisSortedQueue) DequeTop(ctx context.Context, queueKey string, amou
 		_, _ = mutex.Unlock()
 	}()
 
-	var members []interface{}
+	var members []string
 	if rsq.client.ZCard(ctx, queueKey).Val() >= amount {
 		for _, p := range rsq.client.ZPopMin(ctx, queueKey, amount).Val() {
-			members = append(members, p.Member)
+			members = append(members, p.Member.(string))
 		}
 	}
 	return members, nil

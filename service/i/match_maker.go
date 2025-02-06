@@ -1,8 +1,12 @@
 package i
 
-import "context"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
 
 type Matchmaker interface {
-	PushToQueue(ctx context.Context, id string, rank int, latency uint) error
-	GetScore(ctx context.Context, id string, rank int, latency uint) (int64, error)
+	PushToQueue(ctx context.Context, id uuid.UUID, rating int, latency uint) error
+	SetMatchHandler(func([]uuid.UUID))
 }
