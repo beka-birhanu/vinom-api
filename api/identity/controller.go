@@ -67,7 +67,7 @@ func (c *IdentityServer) login(ctx *gin.Context) {
 	}
 
 	response := &AuthResponse{
-		ID:       user.ID.String(),
+		ID:       user.ID,
 		Username: user.Username,
 		Rating:   user.Rating,
 		Token:    token,
