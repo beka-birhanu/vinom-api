@@ -12,5 +12,5 @@ type GameSessionManager interface {
 	StopAll()
 
 	// SessionInfo returns the public key, socket address.
-	SessionInfo(uuid.UUID) ([]byte, string)
+	SessionInfo(uuid.UUID) ([]byte, string, error)
 }

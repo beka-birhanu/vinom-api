@@ -16,7 +16,7 @@ const (
 	defaultGameDuration = 5 * time.Minute
 
 	gameStateRecordType = 10
-	gameEndedRecordType = 10
+	gameEndedRecordType = 11
 )
 
 var (
@@ -82,7 +82,7 @@ func (g *GameSessionManager) NewSession(playerIDs []uuid.UUID) {
 		players = append(players, player)
 	}
 
-	maze, err := g.mazeFactory(defaultMazeSize, defaultMazeSize)
+	maze, err := g.mazeFactory(20, defaultMazeSize)
 	if err != nil {
 		g.logger.Printf("%s[ERROR]%s creating maze for a new game: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
@@ -111,13 +111,13 @@ func (g *GameSessionManager) NewSession(playerIDs []uuid.UUID) {
 	g.logger.Printf("%s[INFO]%s started new game for players: %v", config.LogInfoColor, config.LogColorReset, playerIDs)
 }
 
-func (g *GameSessionManager) SessionInfo(playerID uuid.UUID) ([]byte, string) {
+func (g *GameSessionManager) SessionInfo(playerID uuid.UUID) ([]byte, string, error) {
 	g.RLock()
 	defer g.RUnlock()
 	if _, ok := g.playerToSession[playerID]; !ok {
-		return nil, ""
+		return nil, "", errors.New("No Session")
 	}
-	return g.socket.GetPublicKey(), g.socket.GetAddr()
+	return g.socket.GetPublicKey(), g.socket.GetAddr(), nil
 }
 
 func (g *GameSessionManager) Authenticate(s []byte) (uuid.UUID, error) {
