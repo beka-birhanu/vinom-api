@@ -8,21 +8,14 @@ import (
 	"github.com/beka-birhanu/vinom-api/service/i"
 )
 
-// RewardModel defines the reward configuration for a maze.
-// RewardOne and RewardTwo represent two possible reward values
-// that can be assigned to maze cells.
-// RewardTypeProb determines the base probability of assigning RewardOne
-// over RewardTwo, adjusted dynamically based on cell location.
-type RewardModel struct {
-	RewardOne      int32   // Value of the first reward type
-	RewardTwo      int32   // Value of the second reward type
-	RewardTypeProb float32 // Base probability of RewardOne (0.0 to 1.0)
-}
-
 // PopulateReward assigns rewards to maze cells based on the RewardModel.
 // The probability of assigning RewardTwo decreases as cells are closer
 // to the center of the maze.
-func PopulateReward(r RewardModel, m *WillsonMaze) error {
+func (m *WillsonMaze) PopulateReward(r struct {
+	RewardOne      int32
+	RewardTwo      int32
+	RewardTypeProb float32
+}) error {
 	// Validate the RewardModel
 	if r.RewardTypeProb > 1 || r.RewardTypeProb < 0 || min(r.RewardOne, r.RewardTwo) < 0 {
 		return fmt.Errorf("invalid RewardModel")

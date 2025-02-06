@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/beka-birhanu/vinom-api/config"
 	"github.com/beka-birhanu/vinom-api/service/i"
 	"github.com/google/uuid"
 )
@@ -172,10 +173,10 @@ func (s *ServerSocketManager) Serve() {
 
 	err := s.conn.SetReadDeadline(time.Time{})
 	if err != nil {
-		s.logger.Println("error resetting connection deadline: ", err)
+		s.logger.Printf("%s[ERROR]%s resetting connection deadline: %s", config.LogErrorColor, config.LogColorReset, err)
 	}
 	s.stop = make(chan bool, 1) // reset the stop channel
-	s.logger.Printf("server listening on udp address: %v", s.conn.LocalAddr().String())
+	s.logger.Printf("%s[INFO]%s server listening on udp address: %v", config.LogInfoColor, config.LogColorReset, s.conn.LocalAddr().String())
 	for {
 		select {
 		case <-s.stop:
@@ -188,10 +189,10 @@ func (s *ServerSocketManager) Serve() {
 					continue
 				}
 
-				s.logger.Printf("error while reading from udp: %s", err)
+				s.logger.Printf("%s[ERROR]%s while reading from udp: %s", config.LogErrorColor, config.LogColorReset, err)
 				continue
 			} else if n > s.readBufferSize {
-				s.logger.Printf("error while reading from udp: %s", ErrMaximumPayloadSizeLimit)
+				s.logger.Printf("%s[ERROR]%s while reading from udp: %s", config.LogErrorColor, config.LogColorReset, ErrMaximumPayloadSizeLimit)
 				continue
 			}
 			s.rawRecords <- rawRecord{
@@ -202,8 +203,8 @@ func (s *ServerSocketManager) Serve() {
 	}
 }
 func (s *ServerSocketManager) Stop() {
-	s.logger.Println("server stoping gracefuly...")
-	defer s.logger.Println("server stoped")
+	s.logger.Printf("%s[INFO]%s server stoping gracefuly...", config.LogErrorColor, config.LogColorReset)
+	defer s.logger.Printf("%s[INFO]%s server stoped", config.LogErrorColor, config.LogColorReset)
 
 	_ = s.conn.SetReadDeadline(time.Unix(0, 1))
 	s.stop <- true
@@ -240,12 +241,12 @@ func (s *ServerSocketManager) handleRawRecords() {
 
 func (s *ServerSocketManager) handleRawRecord(payload []byte, addr *net.UDPAddr) {
 	if len(payload) < minimumPayloadSize {
-		s.logger.Println(ErrMinimumPayloadSizeLimit)
+		s.logger.Printf("%s[ERROR]%s while receving raw record: %s", config.LogErrorColor, config.LogColorReset, ErrMinimumPayloadSizeLimit)
 	}
 
 	record, err := parseRecord(payload)
 	if err != nil {
-		s.logger.Printf("error while parsing record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while parsing record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
@@ -276,13 +277,13 @@ func (s *ServerSocketManager) handleRawRecord(payload []byte, addr *net.UDPAddr)
 func (s *ServerSocketManager) handleHandshakeRecord(r *record, addr *net.UDPAddr) {
 	payload, err := s.asymmCrypto.Decrypt(r.Body)
 	if err != nil {
-		s.logger.Printf("error while decrypting record body: %s", err)
+		s.logger.Printf("%s[ERROR]%s while decrypting record body: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	handshake, err := s.encoder.UnmarshalHandshake(payload)
 	if err != nil {
-		s.logger.Printf("error while unmarshaling client hello record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while unmarshaling client hello record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 	// First client hello
@@ -297,7 +298,7 @@ func (s *ServerSocketManager) handleHandshakeRecord(r *record, addr *net.UDPAddr
 func (s *ServerSocketManager) handlePingRecord(r *record, addr *net.UDPAddr) {
 	cl, err := s.findClientWithAddr(addr)
 	if err != nil {
-		s.logger.Printf("error while authenticating ping record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while authenticating ping record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
@@ -306,25 +307,25 @@ func (s *ServerSocketManager) handlePingRecord(r *record, addr *net.UDPAddr) {
 
 	pingPayload, err := s.symmCrypto.Decrypt(r.Body, cl.eKey)
 	if err != nil {
-		s.logger.Printf("error while decrypting ping record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while decrypting ping record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	sessionID, body, err := splitSessionIDAndBody(pingPayload, len(cl.sessionID))
 	if err != nil {
-		s.logger.Printf("error while parsing session id for ping: %s", err)
+		s.logger.Printf("%s[ERROR]%s while parsing session id for ping: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	if !bytes.Equal(sessionID, cl.sessionID) {
-		s.logger.Printf("error while validating session id for ping: %s", ErrClientSessionNotFound)
+		s.logger.Printf("%s[ERROR]%s while validating session id for ping: %s", config.LogErrorColor, config.LogColorReset, ErrClientSessionNotFound)
 		s.unAuthenticated(addr)
 		return
 	}
 
 	pingRecord, err := s.encoder.UnmarshalPing(body)
 	if err != nil {
-		s.logger.Printf("error while unmarshaling ping record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while unmarshaling ping record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
@@ -333,13 +334,13 @@ func (s *ServerSocketManager) handlePingRecord(r *record, addr *net.UDPAddr) {
 
 	pongPayload, err := s.encoder.MarshalPong(pong)
 	if err != nil {
-		s.logger.Printf("error while marshaling pong record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while marshaling pong record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	err = s.sendToClient(cl, PongRecordType, pongPayload)
 	if err != nil {
-		s.logger.Printf("error while sending pong recored: %s", err)
+		s.logger.Printf("%s[ERROR]%s while sending pong recored: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
@@ -352,25 +353,25 @@ func (s *ServerSocketManager) handlePingRecord(r *record, addr *net.UDPAddr) {
 func (s *ServerSocketManager) handleCustomRecord(r *record, addr *net.UDPAddr) {
 	cl, err := s.findClientWithAddr(addr)
 	if err != nil {
-		s.logger.Printf("error while authenticating custom record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while authenticating custom record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	payload, err := s.symmCrypto.Decrypt(r.Body, cl.eKey)
 	if err != nil {
-		s.logger.Printf("error while decrypting custom record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while decrypting custom record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	sessionID, body, err := splitSessionIDAndBody(payload, len(cl.sessionID))
 	if err != nil {
-		s.logger.Printf("error while parsing session id for custom: %s", err)
+		s.logger.Printf("%s[ERROR]%s while parsing session id for custom: %s", config.LogErrorColor, config.LogColorReset, err)
 		s.unAuthenticated(addr)
 		return
 	}
 
 	if !bytes.Equal(sessionID, cl.sessionID) {
-		s.logger.Printf("error while validating session id for ping: %s", ErrClientSessionNotFound)
+		s.logger.Printf("%s[ERROR]%s while validating session id for ping: %s", config.LogErrorColor, config.LogColorReset, ErrClientSessionNotFound)
 		return
 	}
 
@@ -381,7 +382,7 @@ func (s *ServerSocketManager) handleCustomRecord(r *record, addr *net.UDPAddr) {
 func (s *ServerSocketManager) sayHelloVerify(addr *net.UDPAddr, h i.HandshakeRecord) {
 	cookie := s.sessionManager.GetAddrCookieHMAC(addr, h.GetRandom())
 	if len(h.GetKey()) < insecureSymmKeySize {
-		s.logger.Println(ErrInsecureEncryptionKeySize)
+		s.logger.Printf("%s[ERROR]%s while handling hello verify record: %s", config.LogErrorColor, config.LogColorReset, ErrInsecureEncryptionKeySize)
 		return
 	}
 
@@ -391,19 +392,19 @@ func (s *ServerSocketManager) sayHelloVerify(addr *net.UDPAddr, h i.HandshakeRec
 
 	helloVerifyPayload, err := s.encoder.MarshalHandshake(helloVerify)
 	if err != nil {
-		s.logger.Printf("error while marshaling hello verify record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while marshaling hello verify record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	helloVerifyPayload, err = s.symmCrypto.Encrypt(helloVerifyPayload, h.GetKey())
 	if err != nil {
-		s.logger.Printf("error while encrypting hello verify: %s", err)
+		s.logger.Printf("%s[ERROR]%s while encrypting HelloVerify: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 	helloVerifyMessage := append([]byte{HelloVerifyRecordType}, helloVerifyPayload...)
 	err = s.sendToAddr(addr, helloVerifyMessage)
 	if err != nil {
-		s.logger.Printf("error while sending HelloVerify record to the client: %s", err)
+		s.logger.Printf("%s[ERROR]%s while sending HelloVerify record to the client: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 }
@@ -412,11 +413,11 @@ func (s *ServerSocketManager) sayHelloVerify(addr *net.UDPAddr, h i.HandshakeRec
 func (s *ServerSocketManager) sayServerHello(addr *net.UDPAddr, h i.HandshakeRecord) {
 	cookie := s.sessionManager.GetAddrCookieHMAC(addr, h.GetRandom())
 	if !s.HMAC.Compare(h.GetCookie(), cookie) {
-		s.logger.Printf("error while validating HelloVerify record cookie: %s", ErrClientCookieIsInvalid)
+		s.logger.Printf("%s[ERROR]%s while validating HelloVerify record cookie: %s", config.LogErrorColor, config.LogColorReset, ErrClientCookieIsInvalid)
 		return
 	}
 	if len(h.GetKey()) < insecureSymmKeySize {
-		s.logger.Println(ErrInsecureEncryptionKeySize)
+		s.logger.Printf("%s[ERROR]%s while handling HelloVerify recored: %s", config.LogErrorColor, config.LogColorReset, ErrInsecureEncryptionKeySize)
 		return
 	}
 
@@ -425,20 +426,20 @@ func (s *ServerSocketManager) sayServerHello(addr *net.UDPAddr, h i.HandshakeRec
 	if len(h.GetToken()) > 0 {
 		token, err = s.symmCrypto.Decrypt(h.GetToken(), h.GetKey())
 		if err != nil {
-			s.logger.Printf("error while decrypting HelloVerify record token: %s", err)
+			s.logger.Printf("%s[ERROR]%s while decrypting HelloVerify record token: %s", config.LogErrorColor, config.LogColorReset, err)
 			return
 		}
 	}
 
 	ID, err := s.authenticator.Authenticate(token)
 	if err != nil {
-		s.logger.Printf("error while authenticating client token: %s", err)
+		s.logger.Printf("%s[ERROR]%s while authenticating client token: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	client, err := s.registerClient(addr, ID, h.GetKey())
 	if err != nil {
-		s.logger.Printf("error while registering client: %s", err)
+		s.logger.Printf("%s[ERROR]%s while registering client: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
@@ -448,17 +449,17 @@ func (s *ServerSocketManager) sayServerHello(addr *net.UDPAddr, h i.HandshakeRec
 
 	serverHelloPayload, err := s.encoder.MarshalHandshake(serverHello)
 	if err != nil {
-		s.logger.Printf("error while marshaling server hello record: %s", err)
+		s.logger.Printf("%s[ERROR]%s while marshaling server hello record: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
 	err = s.sendToClient(client, ServerHelloRecordType, serverHelloPayload)
 	if err != nil {
-		s.logger.Printf("error while sending server hello: %s", err)
+		s.logger.Printf("%s[ERROR]%s while sending server hello: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 
-	s.logger.Printf("accepted connection with client: %s", ID)
+	s.logger.Printf("%s[INFO]%s accepted connection with client: %s", config.LogInfoColor, config.LogColorReset, ID)
 }
 
 // registerClient generates a new session ID & registers an address with client ID & encryption key as a Client
@@ -480,7 +481,10 @@ func (s *ServerSocketManager) registerClient(addr *net.UDPAddr, ID uuid.UUID, eK
 	s.clients[ID] = cl
 	s.clientsLock.Unlock()
 
-	s.onClientRegister(cl.ID)
+	if s.onClientRegister != nil {
+		s.onClientRegister(cl.ID)
+	}
+
 	return cl, nil
 }
 
@@ -507,14 +511,20 @@ func (s *ServerSocketManager) findClientWithAddr(a *net.UDPAddr) (*client, error
 }
 
 // BroadcastToClients broadcasts bytes to all registered Clients
-func (s *ServerSocketManager) BroadcastToClients(typ byte, payload []byte) {
-	for _, cl := range s.clients {
+func (s *ServerSocketManager) BroadcastToClients(clientIDs []uuid.UUID, typ byte, payload []byte) {
+	for _, clID := range clientIDs {
+		cl, ok := s.clients[clID]
+		if !ok {
+			s.logger.Printf("%s[ERROR]%s while writing to the clients: client not found", config.LogErrorColor, config.LogColorReset)
+			continue
+		}
+
 		s.wg.Add(1)
 		go func(c *client) {
 			defer s.wg.Done()
 			err := s.sendToClient(c, typ, payload)
 			if err != nil {
-				s.logger.Printf("error while writing to the client: %s", err)
+				s.logger.Printf("%s[ERROR]%s while writing to the client: %s", config.LogErrorColor, config.LogColorReset, err)
 			}
 		}(cl)
 	}
@@ -554,7 +564,7 @@ func (s *ServerSocketManager) unAuthenticated(addr *net.UDPAddr) {
 	payload := []byte{UnAuthenticated}
 	err := s.sendToAddr(addr, payload)
 	if err != nil {
-		s.logger.Printf("error while sending UnAuthenticated record to the client: %s", err)
+		s.logger.Printf("%s[ERROR]%s while sending UnAuthenticated record to the client: %s", config.LogErrorColor, config.LogColorReset, err)
 		return
 	}
 }
@@ -617,4 +627,24 @@ func ServerWithLogger(l *log.Logger) ServerOption {
 	return func(s *ServerSocketManager) {
 		s.logger = l
 	}
+}
+
+func (s *ServerSocketManager) SetClientRequestHandler(f func(uuid.UUID, byte, []byte)) {
+	s.onCustomClientRequest = f
+}
+
+func (s *ServerSocketManager) SetClientRegisterHandler(f func(uuid.UUID)) {
+	s.onClientRegister = f
+}
+
+func (s *ServerSocketManager) SetClientAuthenticator(a i.PlayerAuthenticator) {
+	s.authenticator = a
+}
+
+func (s *ServerSocketManager) GetPublicKey() []byte {
+	return s.asymmCrypto.GetPublicKey()
+}
+
+func (s *ServerSocketManager) GetAddr() string {
+	return s.conn.LocalAddr().String()
 }

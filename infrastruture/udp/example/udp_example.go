@@ -12,8 +12,7 @@ import (
 	"time"
 
 	"github.com/beka-birhanu/vinom-api/infrastruture/crypto"
-	"github.com/beka-birhanu/vinom-api/infrastruture/pb_encoder/udppb"
-	pb "github.com/beka-birhanu/vinom-api/infrastruture/pb_encoder/udppb"
+	udppb "github.com/beka-birhanu/vinom-api/infrastruture/pb_encoder/udp"
 	"github.com/beka-birhanu/vinom-api/infrastruture/udp"
 	"github.com/google/uuid"
 )
@@ -56,7 +55,7 @@ func main() {
 	client, _ := udp.NewClientServerManager(
 		udp.ClientConfig{
 			ServerAddr:         serverAddr,
-			Encoder:            &pb.Protobuf{},
+			Encoder:            &udppb.Protobuf{},
 			AsymmCrypto:        crypto.NewRSA(asymm),
 			ServerAsymmPubKey:  rsaEnc.GetPublicKey(),
 			SymmCrypto:         crypto.NewAESCBC(),
@@ -75,7 +74,7 @@ func main() {
 	client2, _ := udp.NewClientServerManager(
 		udp.ClientConfig{
 			ServerAddr:         serverAddr,
-			Encoder:            &pb.Protobuf{},
+			Encoder:            &udppb.Protobuf{},
 			AsymmCrypto:        crypto.NewRSA(asymm),
 			ServerAsymmPubKey:  rsaEnc.GetPublicKey(),
 			SymmCrypto:         crypto.NewAESCBC(),

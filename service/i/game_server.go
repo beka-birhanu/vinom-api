@@ -4,8 +4,8 @@ import (
 	"time"
 )
 
-// GameService defines the interface for a maze game service.
-type GameService interface {
+// GameServer defines the interface for a maze game service.
+type GameServer interface {
 	// Start begins the game and listens for player actions or a timeout.
 	Start(gameDuration time.Duration)
 
