@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	maze := maze.New(10, 10)
-	fmt.Println(maze)
+	maz := maze.New(10, 10)
+	maze.PopulateReward(maze.RewardModel{RewardOne: 1, RewardTwo: 5, RewardTypeProb: 0.9}, maz)
+	fmt.Println(maz)
 }
-

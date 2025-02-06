@@ -1,3 +1,14 @@
+/*
+Package maze provides tools for creating and managing rectangular mazes.
+
+It defines the `Maze` structure, composed of `Cell` objects that include wall configurations
+and optional rewards.
+
+The package includes functionality for random maze generation with Wilson's algorithm, wall manipulation,
+and reward assignment. Rewards can be dynamically distributed based on proximity to the maze center.
+
+Utility functions enable neighbor detection, move validation, and ASCII visualization of the maze.
+*/
 package maze
 
 import (
@@ -6,23 +17,27 @@ import (
 	"strings"
 )
 
+// CellPosition represents the position of a cell in the maze grid.
 type CellPosition struct {
-	Row int
-	Col int
+	Row int // Row index of the cell
+	Col int // Column index of the cell
 }
 
+// Move represents a movement from one cell to another in a specific direction.
 type Move struct {
-	From      CellPosition
-	To        CellPosition
-	Direction string
+	From      CellPosition // Starting cell
+	To        CellPosition // Destination cell
+	Direction string       // Direction of the move (North, South, East, West)
 }
 
+// Maze represents a rectangular maze consisting of cells with walls and optional rewards.
 type Maze struct {
-	Width  int
-	Height int
-	Grid   [][]Cell
+	Width  int      // Width of the maze (number of columns)
+	Height int      // Height of the maze (number of rows)
+	Grid   [][]Cell // 2D grid of cells forming the maze
 }
 
+// New initializes a new maze of the given dimensions and generates its layout.
 func New(width, height int) *Maze {
 	grid := make([][]Cell, height)
 	for i := range grid {
@@ -47,10 +62,12 @@ func New(width, height int) *Maze {
 	return maze
 }
 
+// randomCellPosition generates a random position within the maze.
 func (m *Maze) randomCellPosition() CellPosition {
 	return CellPosition{Row: rand.Intn(m.Height), Col: rand.Intn(m.Width)}
 }
 
+// randomUnvisitedCellPosition selects a random position that has not been visited.
 func (m *Maze) randomUnvisitedCellPosition(visited map[string]struct{}) CellPosition {
 	for {
 		pos := m.randomCellPosition()
@@ -61,6 +78,7 @@ func (m *Maze) randomUnvisitedCellPosition(visited map[string]struct{}) CellPosi
 	}
 }
 
+// neighbors finds all valid moves from a given cell position.
 func (m *Maze) neighbors(pos CellPosition) []Move {
 	directions := map[string]CellPosition{
 		"North": {-1, 0}, "South": {1, 0}, "East": {0, 1}, "West": {0, -1},
@@ -75,8 +93,8 @@ func (m *Maze) neighbors(pos CellPosition) []Move {
 	return result
 }
 
+// openWall removes the wall between two adjacent cells in the specified direction.
 func (m *Maze) openWall(move Move) {
-	// Open the wall in the given direction
 	switch move.Direction {
 	case "North":
 		m.Grid[move.From.Row][move.From.Col].NorthWall = false
@@ -93,6 +111,7 @@ func (m *Maze) openWall(move Move) {
 	}
 }
 
+// randomWalk performs a random walk starting from an unvisited cell.
 func (m *Maze) randomWalk(visited map[string]struct{}) map[CellPosition]Move {
 	start := m.randomUnvisitedCellPosition(visited)
 	visits := make(map[CellPosition]Move)
@@ -112,8 +131,8 @@ func (m *Maze) randomWalk(visited map[string]struct{}) map[CellPosition]Move {
 	return visits
 }
 
+// generateMaze creates a maze using a randomized algorithm.
 func (m *Maze) generateMaze() {
-
 	visited := make(map[string]struct{})
 	start := m.randomCellPosition()
 	visited[fmt.Sprintf("%d,%d", start.Row, start.Col)] = struct{}{}
@@ -126,6 +145,23 @@ func (m *Maze) generateMaze() {
 	}
 }
 
+// IsValidMove checks if a move is valid (i.e., the connecting wall is down).
+func (m *Maze) IsValidMove(move Move) bool {
+	switch move.Direction {
+	case "North":
+		return !m.Grid[move.From.Row][move.From.Col].NorthWall && !m.Grid[move.To.Row][move.To.Col].SouthWall
+	case "South":
+		return !m.Grid[move.From.Row][move.From.Col].SouthWall && !m.Grid[move.To.Row][move.To.Col].NorthWall
+	case "East":
+		return !m.Grid[move.From.Row][move.From.Col].EastWall && !m.Grid[move.To.Row][move.To.Col].WestWall
+	case "West":
+		return !m.Grid[move.From.Row][move.From.Col].WestWall && !m.Grid[move.To.Row][move.To.Col].EastWall
+	default:
+		return false
+	}
+}
+
+// String provides a textual representation of the maze.
 func (m *Maze) String() string {
 	var output string
 
@@ -137,10 +173,19 @@ func (m *Maze) String() string {
 		cellRow := "|"
 		for col := 0; col < m.Width; col++ {
 			cell := m.Grid[row][col]
-			if !cell.EastWall {
-				cellRow += "    "
+
+			// Display reward if present, otherwise leave the cell empty
+			if cell.Reward != 0 {
+				cellRow += " " + fmt.Sprint(cell.Reward) + " "
 			} else {
-				cellRow += "   |"
+				cellRow += "   "
+			}
+
+			// Add east wall or space
+			if cell.EastWall {
+				cellRow += "|"
+			} else {
+				cellRow += " "
 			}
 		}
 		output += cellRow + "\n"
@@ -149,10 +194,12 @@ func (m *Maze) String() string {
 		wallRow := "+"
 		for col := 0; col < m.Width; col++ {
 			cell := m.Grid[row][col]
-			if !cell.SouthWall {
-				wallRow += "   +"
-			} else {
+
+			// Add south wall or space
+			if cell.SouthWall {
 				wallRow += "---+"
+			} else {
+				wallRow += "   +"
 			}
 		}
 		output += wallRow + "\n"
@@ -160,4 +207,3 @@ func (m *Maze) String() string {
 
 	return output
 }
-
