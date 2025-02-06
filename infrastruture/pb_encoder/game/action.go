@@ -32,7 +32,7 @@ func (x *Action) SetDirection(s string) {
 
 // GetID implements game.Action.
 func (x *Action) GetID() uuid.UUID {
-	id, _ := uuid.FromBytes([]byte(x.Id))
+	id, _ := uuid.Parse(x.Id)
 	return id
 }
 
