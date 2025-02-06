@@ -27,7 +27,7 @@ var (
 type User struct {
 	ID           uuid.UUID `bson:"_id"`
 	Username     string    `bson:"username"`
-	PasswordHash string    `bson:"password_hash"`
+	PasswordHash string    `bson:"passwordHash"`
 	Rating       int       `bson:"rating"`
 }
 

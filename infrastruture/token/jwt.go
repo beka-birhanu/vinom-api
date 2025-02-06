@@ -1,18 +1,12 @@
-package identity
+package token
 
 import (
 	"errors"
 	"time"
 
+	"github.com/beka-birhanu/vinom-api/service/i"
 	"github.com/dgrijalva/jwt-go"
 )
-
-type TokenService interface {
-	Generate(map[string]interface{}, time.Duration) (string, error)
-	Decode(string) (map[string]interface{}, error)
-}
-
-var _ TokenService = &JwtService{}
 
 // JwtService handles JWT operations.
 // Implements ijwt.JwtService.
@@ -22,7 +16,7 @@ type JwtService struct {
 }
 
 // New creates a new JWT Service with the provided configuration.
-func NewJwtService(secretKey, issuer string) *JwtService {
+func NewJwtService(secretKey, issuer string) i.Tokenizer {
 	return &JwtService{
 		secretKey: secretKey,
 		issuer:    issuer,
