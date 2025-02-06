@@ -21,6 +21,15 @@ const (
 	maxMazeDimenssion = 20
 )
 
+var (
+	Directions = map[string]CellPosition{
+		"North": {Row: -1, Col: 0},
+		"South": {Row: 1, Col: 0},
+		"East":  {Row: 0, Col: 1},
+		"West":  {Row: 0, Col: -1},
+	}
+)
+
 // CellPosition represents the position of a cell in the maze grid.
 type CellPosition struct {
 	Row int // Row index of the cell
@@ -36,9 +45,9 @@ type Move struct {
 
 // Maze represents a rectangular maze consisting of cells with walls and optional rewards.
 type Maze struct {
-	Width  int      // Width of the maze (number of columns)
-	Height int      // Height of the maze (number of rows)
-	Grid   [][]Cell // 2D grid of cells forming the maze
+	Width  int       // Width of the maze (number of columns)
+	Height int       // Height of the maze (number of rows)
+	Grid   [][]*Cell // 2D grid of cells forming the maze
 }
 
 // New initializes a new maze of the given dimensions and generates its layout.
@@ -47,11 +56,11 @@ func New(width, height int) (*Maze, error) {
 		return nil, fmt.Errorf("Invalid maze dimensions")
 	}
 
-	grid := make([][]Cell, height)
+	grid := make([][]*Cell, height)
 	for i := range grid {
-		grid[i] = make([]Cell, width)
+		grid[i] = make([]*Cell, width)
 		for j := range grid[i] {
-			grid[i][j] = Cell{
+			grid[i][j] = &Cell{
 				NorthWall: true,
 				SouthWall: true,
 				EastWall:  true,
@@ -88,11 +97,8 @@ func (m *Maze) randomUnvisitedCellPosition(visited map[string]struct{}) CellPosi
 
 // neighbors finds all valid moves from a given cell position.
 func (m *Maze) neighbors(pos CellPosition) []Move {
-	directions := map[string]CellPosition{
-		"North": {-1, 0}, "South": {1, 0}, "East": {0, 1}, "West": {0, -1},
-	}
 	var result []Move
-	for dir, delta := range directions {
+	for dir, delta := range Directions {
 		neighbor := CellPosition{Row: pos.Row + delta.Row, Col: pos.Col + delta.Col}
 		if neighbor.Row >= 0 && neighbor.Row < m.Height && neighbor.Col >= 0 && neighbor.Col < m.Width {
 			result = append(result, Move{From: pos, To: neighbor, Direction: dir})
@@ -102,7 +108,7 @@ func (m *Maze) neighbors(pos CellPosition) []Move {
 }
 
 // openWall removes the wall between two adjacent cells in the specified direction.
-func (m *Maze) openWall(move Move) {
+func (m *Maze) openWall(move Move) error {
 	switch move.Direction {
 	case "North":
 		m.Grid[move.From.Row][move.From.Col].NorthWall = false
@@ -117,6 +123,8 @@ func (m *Maze) openWall(move Move) {
 		m.Grid[move.From.Row][move.From.Col].WestWall = false
 		m.Grid[move.To.Row][move.To.Col].EastWall = false
 	}
+
+	return nil
 }
 
 // randomWalk performs a random walk starting from an unvisited cell.
@@ -147,7 +155,7 @@ func (m *Maze) generateMaze() {
 
 	for len(visited) < m.Width*m.Height {
 		for cell, move := range m.randomWalk(visited) {
-			m.openWall(move)
+			_ = m.openWall(move)
 			visited[fmt.Sprintf("%d,%d", cell.Row, cell.Col)] = struct{}{}
 		}
 	}
@@ -155,6 +163,13 @@ func (m *Maze) generateMaze() {
 
 // IsValidMove checks if a move is valid (i.e., the connecting wall is down).
 func (m *Maze) IsValidMove(move Move) bool {
+	inBound := func(row, col int) bool {
+		return row >= 0 && row < m.Height && col >= 0 && col < m.Width
+	}
+
+	if !inBound(move.From.Row, move.From.Col) || !inBound(move.To.Row, move.To.Col) {
+		return false
+	}
 	switch move.Direction {
 	case "North":
 		return !m.Grid[move.From.Row][move.From.Col].NorthWall && !m.Grid[move.To.Row][move.To.Col].SouthWall
