@@ -47,6 +47,14 @@ func (p *Protobuf) MarshalPong(pr udp.PongRecord) ([]byte, error) {
 	return proto.Marshal(msg)
 }
 
+// MarshalPing implements udp.Encoder.
+func (p *Protobuf) MarshalPing(pr udp.PingRecord) ([]byte, error) {
+	msg := &Ping{
+		SentAt: pr.GetSentAt(),
+	}
+	return proto.Marshal(msg)
+}
+
 // NewHandshakeRecord implements udp.Encoder.
 func (p *Protobuf) NewHandshakeRecord() udp.HandshakeRecord {
 	return &Handshake{}
@@ -55,6 +63,11 @@ func (p *Protobuf) NewHandshakeRecord() udp.HandshakeRecord {
 // NewPongRecord implements udp.Encoder.
 func (p *Protobuf) NewPongRecord() udp.PongRecord {
 	return &Pong{}
+}
+
+// NewPingRecord implements udp.Encoder.
+func (p *Protobuf) NewPingRecord() udp.PingRecord {
+	return &Ping{}
 }
 
 // Unmarshal implements udp.Encoder.
@@ -78,4 +91,11 @@ func (p *Protobuf) UnmarshalPing(b []byte) (udp.PingRecord, error) {
 	pi := &Ping{}
 	err := proto.Unmarshal(b, pi)
 	return pi, err
+}
+
+// UnmarshalPing implements udp.Encoder.
+func (p *Protobuf) UnmarshalPong(b []byte) (udp.PongRecord, error) {
+	po := &Pong{}
+	err := proto.Unmarshal(b, po)
+	return po, err
 }

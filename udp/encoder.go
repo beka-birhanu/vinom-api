@@ -17,6 +17,7 @@ type HandshakeRecord interface {
 
 type PingRecord interface {
 	GetSentAt() int64
+	SetSentAt(int64)
 }
 
 type PongRecord interface {
@@ -37,6 +38,9 @@ type Encoder interface {
 	UnmarshalHandshake([]byte) (HandshakeRecord, error)
 
 	UnmarshalPing([]byte) (PingRecord, error)
+	UnmarshalPong([]byte) (PongRecord, error)
 	NewPongRecord() PongRecord
+	NewPingRecord() PingRecord
 	MarshalPong(PongRecord) ([]byte, error)
+	MarshalPing(PingRecord) ([]byte, error)
 }
