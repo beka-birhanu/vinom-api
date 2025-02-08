@@ -4,18 +4,19 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"time"
 
-	"github.com/beka-birhanu/vinom-api/infrastruture/crypto"
-	gamepb "github.com/beka-birhanu/vinom-api/infrastruture/pb_encoder/game"
-	udppb "github.com/beka-birhanu/vinom-api/infrastruture/pb_encoder/udp"
-	"github.com/beka-birhanu/vinom-api/infrastruture/udp"
-	maze "github.com/beka-birhanu/vinom-api/infrastruture/willson_maze"
+	crypto "github.com/beka-birhanu/udp-socket-manager/crypto"
+	udppb "github.com/beka-birhanu/udp-socket-manager/encoding"
+	udpsocket "github.com/beka-birhanu/udp-socket-manager/socket"
+	"github.com/beka-birhanu/vinom-api/config"
+	logger "github.com/beka-birhanu/vinom-api/infrastruture/log"
 	game "github.com/beka-birhanu/vinom-api/service"
-	"github.com/beka-birhanu/vinom-api/service/i"
+	gamepb "github.com/beka-birhanu/vinom-game-encoder"
+	game_i "github.com/beka-birhanu/vinom-interfaces/game"
+	maze "github.com/beka-birhanu/wilson-maze"
 	"github.com/google/uuid"
 )
 
@@ -54,7 +55,7 @@ func main1() {
 	if p1pos == nil {
 		return
 	}
-	gameServer, err := game.NewGame(maz, []i.Player{player1, player2}, game_encoder)
+	gameServer, err := game.NewGame(maz, []game_i.Player{player1, player2}, game_encoder)
 	if err != nil {
 		return
 	}
@@ -71,25 +72,33 @@ func main1() {
 		return
 	}
 	rsaEnc := crypto.NewRSA(asymm)
-	server, _ := udp.NewServerSocketManager(udp.ServerConfig{
+	serverLogger, err := logger.New("SERVER-SOCKET", config.ColorBlue, os.Stdout)
+	if err != nil {
+		os.Exit(1)
+	}
+	server, _ := udpsocket.NewServerSocketManager(udpsocket.ServerConfig{
 		ListenAddr:    serverAddr,
 		Authenticator: &a1{},
 		AsymmCrypto:   rsaEnc,
 		SymmCrypto:    crypto.NewAESCBC(),
 		Encoder:       &udppb.Protobuf{},
 		HMAC:          &crypto.HMAC{},
+		Logger:        serverLogger,
 	},
-		udp.ServerWithClientRegisterHandler(func(u uuid.UUID) { fmt.Printf("\nuser %s registerd", u) }),
-		udp.ServerWithReadBufferSize(2048),
-		udp.ServerWithLogger(log.New(os.Stdout, "\n@Server Socket@------@", 1)),
-		udp.ServerWithHeartbeatExpiration(time.Second),
-		udp.ServerWithClientRequestHandler(func(u uuid.UUID, b1 byte, b2 []byte) { gameServer.ActionChan() <- []byte{1} }),
+		udpsocket.ServerWithClientRegisterHandler(func(u uuid.UUID) { fmt.Printf("\nuser %s registerd", u) }),
+		udpsocket.ServerWithReadBufferSize(2048),
+		udpsocket.ServerWithHeartbeatExpiration(time.Second),
+		udpsocket.ServerWithClientRequestHandler(func(u uuid.UUID, b1 byte, b2 []byte) { gameServer.ActionChan() <- []byte{1} }),
 	)
 
 	aesKey := []byte{113, 110, 25, 53, 11, 53, 68, 33, 17, 36, 22, 7, 125, 11, 35, 16, 83, 61, 59, 49, 31, 22, 69, 17, 24, 125, 11, 35, 16, 83, 61, 59}
 	p1 := player1.GetID()
-	client, _ := udp.NewClientServerManager(
-		udp.ClientConfig{
+	client1Logger, err := logger.New("CLIENT-ONE-SOCKET", config.ColorBlue, os.Stdout)
+	if err != nil {
+		os.Exit(1)
+	}
+	client, _ := udpsocket.NewClientServerManager(
+		udpsocket.ClientConfig{
 			ServerAddr:         serverAddr,
 			Encoder:            &udppb.Protobuf{},
 			AsymmCrypto:        crypto.NewRSA(asymm),
@@ -103,13 +112,17 @@ func main1() {
 				fmt.Printf("\n#Client Socket One#------#server responeded with: %v, %v", t, m)
 			},
 			OnPingResult: func(i int64) {},
+			Logger:       client1Logger,
 		},
-		udp.ClientWithLogger(log.New(os.Stdout, "\n#Client Socket One#------#", 1)),
-		udp.ClientWithPingInterval(500*time.Millisecond),
+		udpsocket.ClientWithPingInterval(500*time.Millisecond),
 	)
 	p2 := player2.GetID()
-	client2, _ := udp.NewClientServerManager(
-		udp.ClientConfig{
+	client2Logger, err := logger.New("CLIENT-ONE-SOCKET", config.ColorBlue, os.Stdout)
+	if err != nil {
+		os.Exit(1)
+	}
+	client2, _ := udpsocket.NewClientServerManager(
+		udpsocket.ClientConfig{
 			ServerAddr:         serverAddr,
 			Encoder:            &udppb.Protobuf{},
 			AsymmCrypto:        crypto.NewRSA(asymm),
@@ -123,9 +136,9 @@ func main1() {
 				fmt.Printf("\n#Client Socket Two#------#server responeded with: %v, %v", t, m)
 			},
 			OnPingResult: func(i int64) {},
+			Logger:       client2Logger,
 		},
-		udp.ClientWithLogger(log.New(os.Stdout, "\n#Client Socket Two#------#", 1)),
-		udp.ClientWithPingInterval(500*time.Millisecond),
+		udpsocket.ClientWithPingInterval(500*time.Millisecond),
 	)
 
 	go server.Serve()

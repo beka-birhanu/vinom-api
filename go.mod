@@ -1,19 +1,22 @@
 module github.com/beka-birhanu/vinom-api
 
-go 1.23.4
+go 1.23.6
 
 require (
+	github.com/beka-birhanu/udp-socket-manager v0.0.0-20250208110149-db9c355b3db0
+	github.com/beka-birhanu/vinom-game-encoder v0.0.0-20250208072810-17ca6136885b
+	github.com/beka-birhanu/vinom-interfaces v0.0.0-20250208062558-5610abbec85d
+	github.com/beka-birhanu/wilson-maze v0.0.0-20250208074316-8723f23a2ce3
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-redsync/redsync/v4 v4.13.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/nbutton23/zxcvbn-go v0.0.0-20210217022336-fa2cb2858354
-	github.com/redis/go-redis/v9 v9.5.1
-	github.com/stretchr/testify v1.9.0
-	go.mongodb.org/mongo-driver v1.17.1
-	golang.org/x/crypto v0.26.0
-	google.golang.org/protobuf v1.35.2
+	github.com/redis/go-redis/v9 v9.7.0
+	github.com/stretchr/testify v1.10.0
+	go.mongodb.org/mongo-driver v1.17.2
+	golang.org/x/crypto v0.33.0
 )
 
 require (
@@ -34,7 +37,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -51,8 +54,9 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	golang.org/x/arch v0.8.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.23.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
+	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"time"
 
-	"github.com/beka-birhanu/vinom-api/config"
 	"github.com/beka-birhanu/vinom-api/service/i"
+	general_i "github.com/beka-birhanu/vinom-interfaces/general"
 	"github.com/google/uuid"
 )
 
@@ -36,7 +34,6 @@ type player struct {
 type Options struct {
 	Prefix           string
 	Handler          handlerFunc
-	Logger           *log.Logger
 	MaxPlayer        int64
 	RankTolerance    int
 	LatencyTolerance int
@@ -44,19 +41,16 @@ type Options struct {
 
 type Matchmaker struct {
 	sortedQueue i.SortedQueue
+	logger      general_i.Logger
 	opts        *Options
 }
 
-func NewMatchmaker(sortedQueue i.SortedQueue, opts *Options) (i.Matchmaker, error) {
+func NewMatchmaker(sortedQueue i.SortedQueue, logger general_i.Logger, opts *Options) (i.Matchmaker, error) {
 	if opts == nil {
 		opts = &Options{
 			MaxPlayer: defaultMaxPlayer,
 			Prefix:    defaultPrefix,
 		}
-	}
-
-	if opts.Logger == nil {
-		opts.Logger = log.New(io.Discard, "", 0)
 	}
 
 	if opts.MaxPlayer <= 0 {
@@ -78,11 +72,12 @@ func NewMatchmaker(sortedQueue i.SortedQueue, opts *Options) (i.Matchmaker, erro
 	return &Matchmaker{
 		opts:        opts,
 		sortedQueue: sortedQueue,
+		logger:      logger,
 	}, nil
 }
 
 func (mm *Matchmaker) PushToQueue(ctx context.Context, id uuid.UUID, rank int, latency uint) error {
-	mm.opts.Logger.Printf("%s[INFO]%s Adding player to queue: ID=%s Rank=%d Latency=%d", config.LogInfoColor, config.LogColorReset, id, rank, latency)
+	mm.logger.Info(fmt.Sprintf("Adding player to queue: ID=%s Rank=%d Latency=%d", id, rank, latency))
 	return mm.pushPlayerToQueue(ctx, &player{
 		ID:      id,
 		Rank:    rank,
@@ -94,11 +89,11 @@ func (mm *Matchmaker) pushPlayerToQueue(ctx context.Context, player *player) err
 	score := float64(time.Now().UnixNano())
 	err := mm.sortedQueue.Enqueue(ctx, mm.queueKey(player.Rank, player.Latency), score, player.ID.String())
 	if err != nil {
-		mm.opts.Logger.Printf("%s[ERROR]%s Failed to enqueue player: %s", config.LogErrorColor, config.LogColorReset, err)
+		mm.logger.Error(fmt.Sprintf("Failed to enqueue player: %s", err))
 		return err
 	}
 
-	mm.opts.Logger.Printf("%s[INFO]%s Player enqueued successfully: ID=%s", config.LogInfoColor, config.LogColorReset, player.ID)
+	mm.logger.Info(fmt.Sprintf("Player enqueued successfully: ID=%s", player.ID))
 	go mm.match(ctx, player.Rank, player.Latency)
 	return nil
 }
@@ -110,7 +105,7 @@ func (mm *Matchmaker) match(ctx context.Context, rank int, latency uint) {
 	if qLen >= mm.opts.MaxPlayer {
 		rawPlayers, err := mm.sortedQueue.DequeTops(ctx, queueKey, mm.opts.MaxPlayer)
 		if err != nil {
-			mm.opts.Logger.Printf("%s[ERROR]%s Error obtaining match lock: %s", config.LogErrorColor, config.LogColorReset, err)
+			mm.logger.Error(fmt.Sprintf("obtaining match lock: %s", err))
 			return
 		}
 
@@ -119,12 +114,12 @@ func (mm *Matchmaker) match(ctx context.Context, rank int, latency uint) {
 			if id, err := uuid.Parse(raw); err == nil {
 				playersIDs = append(playersIDs, id)
 			} else {
-				mm.opts.Logger.Printf("%s[ERROR]%s Non-UUID value in queue: %s", config.LogErrorColor, config.LogColorReset, raw)
+				mm.logger.Warning(fmt.Sprintf("Non-UUID value in queue: %s", raw))
 			}
 		}
 
 		if mm.opts.Handler != nil {
-			mm.opts.Logger.Printf("%s[INFO]%s Match found for players: %v", config.LogInfoColor, config.LogColorReset, playersIDs)
+			mm.logger.Info(fmt.Sprintf("Match found for players: %v", playersIDs))
 			go mm.opts.Handler(playersIDs)
 		}
 	}

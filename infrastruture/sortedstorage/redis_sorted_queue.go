@@ -2,6 +2,7 @@ package sortedstorage
 
 import (
 	"context"
+	"time"
 
 	"github.com/beka-birhanu/vinom-api/service/i"
 	"github.com/go-redsync/redsync/v4"
@@ -9,24 +10,38 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisSortedQueue manages a sorted queue in Redis.
+// RedisSortedQueue manages a sorted queue in Redis with TTL support.
 type RedisSortedQueue struct {
 	client *redis.Client
 	locker *redsync.Redsync
+	ttl    time.Duration
 }
 
-// NewRedisSortedQueue initializes a RedisSortedQueue with the provided Redis client.
-func NewRedisSortedQueue(client *redis.Client) (i.SortedQueue, error) {
-	queue := &RedisSortedQueue{client: client}
+// NewRedisSortedQueue initializes a RedisSortedQueue with the provided Redis client and TTL.
+func NewRedisSortedQueue(client *redis.Client, ttlSeconds int) (i.SortedQueue, error) {
+	queue := &RedisSortedQueue{
+		client: client,
+		ttl:    time.Duration(ttlSeconds) * time.Second,
+	}
 	pool := goredis.NewPool(client)
 	queue.locker = redsync.New(pool)
 	return queue, nil
 }
 
-// Enqueue adds a member to the sorted queue with a given score.
+// Enqueue adds a member to the sorted queue with a given score and sets expiration if necessary.
 func (rsq *RedisSortedQueue) Enqueue(ctx context.Context, queueKey string, score float64, member string) error {
 	_, err := rsq.client.ZAdd(ctx, queueKey, redis.Z{Score: score, Member: member}).Result()
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Set expiration only if it's not already set
+	ttl, err := rsq.client.TTL(ctx, queueKey).Result()
+	if err == nil && ttl == -1 {
+		_ = rsq.client.Expire(ctx, queueKey, rsq.ttl).Err()
+	}
+
+	return nil
 }
 
 // DequeTops removes and retrieves up to `amount` members with the lowest scores.
@@ -45,6 +60,7 @@ func (rsq *RedisSortedQueue) DequeTops(ctx context.Context, queueKey string, amo
 			members = append(members, p.Member.(string))
 		}
 	}
+
 	return members, nil
 }
 

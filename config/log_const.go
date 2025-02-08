@@ -1,15 +1,10 @@
 package config
 
-const (
-	LogErrorColor = "\033[31m"
-	LogInfoColor  = "\033[32m"
-	LogColorReset = "\033[0m"
-)
-
 // Color constants for logging
 const (
-	ColorBlue    = "\033[34m"
-	ColorMagenta = "\033[35m"
-	ColorCyan    = "\033[36m"
-	ColorReset   = "\033[0m"
+	ColorPurple = "\033[35m"
+	ColorBlue   = "\033[34m"
+	ColorCyan   = "\033[36m"
+	ColorGreen  = "\033[32m"
+	ColorReset  = "\033[0m" // Reset to default
 )

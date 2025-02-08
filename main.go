@@ -5,26 +5,28 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"time"
 
+	crypto "github.com/beka-birhanu/udp-socket-manager/crypto"
+	udppb "github.com/beka-birhanu/udp-socket-manager/encoding"
+	udpsocket "github.com/beka-birhanu/udp-socket-manager/socket"
 	"github.com/beka-birhanu/vinom-api/api"
 	gameapi "github.com/beka-birhanu/vinom-api/api/game"
-	apii "github.com/beka-birhanu/vinom-api/api/i"
+	api_i "github.com/beka-birhanu/vinom-api/api/i"
 	"github.com/beka-birhanu/vinom-api/api/identity"
 	"github.com/beka-birhanu/vinom-api/config"
-	"github.com/beka-birhanu/vinom-api/infrastruture/crypto"
-	gamepb "github.com/beka-birhanu/vinom-api/infrastruture/pb_encoder/game"
-	udppb "github.com/beka-birhanu/vinom-api/infrastruture/pb_encoder/udp"
+	logger "github.com/beka-birhanu/vinom-api/infrastruture/log"
 	"github.com/beka-birhanu/vinom-api/infrastruture/repo"
 	"github.com/beka-birhanu/vinom-api/infrastruture/sortedstorage"
 	"github.com/beka-birhanu/vinom-api/infrastruture/token"
-	"github.com/beka-birhanu/vinom-api/infrastruture/udp"
-	maze "github.com/beka-birhanu/vinom-api/infrastruture/willson_maze"
 	"github.com/beka-birhanu/vinom-api/service"
 	"github.com/beka-birhanu/vinom-api/service/i"
+	gamepb "github.com/beka-birhanu/vinom-game-encoder"
+	general_i "github.com/beka-birhanu/vinom-interfaces/general"
+	socket_i "github.com/beka-birhanu/vinom-interfaces/socket"
+	maze "github.com/beka-birhanu/wilson-maze"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -34,15 +36,16 @@ import (
 var (
 	redisClient           *redis.Client
 	mongoClient           *mongo.Client
-	udpSocketManager      i.ServerSocketManager
+	udpSocketManager      socket_i.ServerSocketManager
 	gameSessionManager    i.GameSessionManager
 	userRepo              i.UserRepo
 	matchmaker            i.Matchmaker
-	matchmakingController apii.Controller
+	matchmakingController api_i.Controller
 	jwtToken              i.Tokenizer
 	authService           i.Authenticator
-	authController        apii.Controller
+	authController        api_i.Controller
 	router                *api.Router
+	appLogger             general_i.Logger
 )
 
 // Initialization functions
@@ -51,9 +54,10 @@ func initRedis(ctx context.Context) {
 
 	redisClient = redis.NewClient(&redis.Options{Addr: addr, DB: 0})
 	if _, err := redisClient.Ping(ctx).Result(); err != nil {
-		log.Fatalf("%s[APP] [ERROR] Failed to connect to Redis: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Failed to connect to Redis: %v", err))
+		os.Exit(1)
 	}
-	log.Printf("%s[APP] [INFO] Connected to Redis!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("Connected to Redis")
 }
 
 func initMongo(ctx context.Context) {
@@ -63,124 +67,148 @@ func initMongo(ctx context.Context) {
 	var err error
 	mongoClient, err = mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Failed to connect to MongoDB: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Failed to connect to MongoDB: %v", err))
+		os.Exit(1)
 	}
 	if err = mongoClient.Ping(ctx, nil); err != nil {
-		log.Fatalf("%s[APP] [ERROR] MongoDB ping failed: %v%s", config.LogErrorColor, uri, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("MongoDB ping failed: %v", err))
+		os.Exit(1)
 	}
-	log.Printf("%s[APP] [INFO] Connected to MongoDB!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("Connected to MongoDB")
 }
 
 func initUDPSocketManager() {
 	serverAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%v", config.Envs.HostIP, config.Envs.UDPPort))
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Resolving server address: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Resolving server address: %v", err))
+		os.Exit(1)
 	}
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Generating RSA key: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Generating RSA key: %v", err))
+		os.Exit(1)
 	}
 
 	rsaEnc := crypto.NewRSA(privateKey)
-	server, err := udp.NewServerSocketManager(
-		udp.ServerConfig{
+
+	serverLogger, err := logger.New("SERVER-SOCKET", config.ColorBlue, os.Stdout)
+	if err != nil {
+		appLogger.Error(fmt.Sprintf("Creating UDP socket manager logger: %v", err))
+		os.Exit(1)
+	}
+	server, err := udpsocket.NewServerSocketManager(
+		udpsocket.ServerConfig{
 			ListenAddr:  serverAddr,
 			AsymmCrypto: rsaEnc,
 			SymmCrypto:  crypto.NewAESCBC(),
 			Encoder:     &udppb.Protobuf{},
 			HMAC:        &crypto.HMAC{},
+			Logger:      serverLogger,
 		},
-		udp.ServerWithReadBufferSize(config.Envs.UDPBufferSize),
-		udp.ServerWithLogger(log.New(os.Stdout, fmt.Sprintf("%s[SERVER-SOCKET] %s", config.ColorBlue, config.LogColorReset), log.LstdFlags|log.Lmsgprefix)),
-		udp.ServerWithHeartbeatExpiration(3*time.Second),
+		udpsocket.ServerWithReadBufferSize(config.Envs.UDPBufferSize),
+		udpsocket.ServerWithHeartbeatExpiration(3*time.Second),
 	)
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Creating server UDP socket manager: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Creating server UDP socket manager: %v", err))
+		os.Exit(1)
 	}
 
 	udpSocketManager = server
-	log.Printf("%s[APP] [INFO] UDP Socket Manager initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("UDP Socket Manager initialized")
 }
 
-func initGameSessionManager(socketManager i.ServerSocketManager) {
+func initGameSessionManager(socketManager socket_i.ServerSocketManager) {
+	gameLogger, err := logger.New("GAME-MANAGER", config.ColorCyan, os.Stdout)
+	if err != nil {
+		appLogger.Error(fmt.Sprintf("Creating UDP socket manager logger: %v", err))
+		os.Exit(1)
+	}
 	manager, err := service.NewGameSessionManager(
 		&service.Config{
 			Socket:       socketManager,
 			MazeFactory:  maze.New,
 			GameEndcoder: &gamepb.Protobuf{},
-			Logger:       log.New(os.Stdout, fmt.Sprintf("%s[GAME-MANAGER] %s", config.ColorCyan, config.LogColorReset), log.LstdFlags|log.Lmsgprefix),
+			Logger:       gameLogger,
 		},
 	)
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Creating game session manager: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Creating game session manager: %v", err))
+		os.Exit(1)
 	}
 	gameSessionManager = manager
-	log.Printf("%s[APP] [INFO] Game Session Manager initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("Game Session Manager initialized")
 }
 
 func initUserRepo(client *mongo.Client) {
 	userRepo = repo.NewUserRepo(client, config.Envs.DBName, "users")
-	log.Printf("%s[APP] [INFO] User repository initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("User repository initialized")
 }
 
 func initMatchmaker(redisClient *redis.Client) {
-	sortedQueue, err := sortedstorage.NewRedisSortedQueue(redisClient)
+	sortedQueue, err := sortedstorage.NewRedisSortedQueue(redisClient, 300)
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Creating Redis sorted queue: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Creating Redis sorted queue: %v", err))
+		os.Exit(1)
 	}
-
+	matchLogger, err := logger.New("MATCH-MAKER", config.ColorPurple, os.Stdout)
+	if err != nil {
+		appLogger.Error(fmt.Sprintf("Creating matchmaker logger: %v", err))
+		os.Exit(1)
+	}
 	options := &service.Options{
-		Logger:           log.New(os.Stdout, fmt.Sprintf("%s[MATCH-MAKER] %s", config.ColorMagenta, config.LogColorReset), log.LstdFlags|log.Lmsgprefix),
 		MaxPlayer:        int64(config.Envs.MaxPlayer),
 		RankTolerance:    config.Envs.RankTolerance,
 		LatencyTolerance: config.Envs.LatencyTolerance,
 	}
 
-	maker, err := service.NewMatchmaker(sortedQueue, options)
+	maker, err := service.NewMatchmaker(sortedQueue, matchLogger, options)
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Creating matchmaker: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Creating matchmaker: %v", err))
+		os.Exit(1)
 	}
 	matchmaker = maker
-	log.Printf("%s[APP] [INFO] Matchmaker initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("Matchmaker initialized")
 }
 
 func initMatchmakingController() {
 	var err error
 	matchmakingController, err = gameapi.NewMatchMakingController(gameSessionManager, userRepo, matchmaker)
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Creating matchmaking controller: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Creating matchmaking controller: %v", err))
+		os.Exit(1)
 	}
-	log.Printf("%s[APP] [INFO] Matchmaking controller initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("Matchmaking controller initialized")
 }
 
 func initJWTTokenizer() {
 	jwtToken = token.NewJwtService(config.Envs.JWTSecret, config.Envs.JWTIssuer)
-	log.Printf("%s[APP] [INFO] JWT Tokenizer initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("JWT Tokenizer initialized")
 }
 
 func initAuthService() {
 	var err error
 	authService, err = service.NewAuthService(userRepo, jwtToken)
 	if err != nil {
-		log.Fatalf("%s[APP] [ERROR] Creating auth service: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Creating auth service: %v", err))
+		os.Exit(1)
 	}
-	log.Printf("%s[APP] [INFO] Auth service initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("Auth service initialized")
 }
 
 func initAuthController() {
 	authController = identity.NewIdentityServer(authService)
-	log.Printf("%s[APP] [INFO] Auth controller initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("Auth controller initialized initialized")
 }
 
 func initRouter(t i.Tokenizer) {
 	router = api.NewRouter(api.Config{
 		Addr:                    fmt.Sprintf("%s:%v", config.Envs.HostIP, config.Envs.RESTPort),
 		BaseURL:                 "/api",
-		Controllers:             []apii.Controller{authController, matchmakingController},
+		Controllers:             []api_i.Controller{authController, matchmakingController},
 		AuthorizationMiddleware: identity.Authoriz(t),
 	})
-	log.Printf("%s[APP] [INFO] Router initialized!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("Router initialized")
 }
 
 // TODO: add socket monitoring.
@@ -189,6 +217,7 @@ func main() {
 	defer cancel()
 
 	// Initialize dependencies
+	appLogger, _ = logger.New("APP", config.ColorGreen, os.Stdout)
 	initRedis(ctx)
 	initMongo(ctx)
 	initUDPSocketManager()
@@ -210,9 +239,10 @@ func main() {
 	}()
 
 	go udpSocketManager.Serve()
-	log.Printf("%s[APP] [INFO] UDP Socket Manager started serving!%s", config.LogInfoColor, config.LogColorReset)
+	appLogger.Info("UDP Socket Manager started serving")
 
 	if err := router.Run(); err != nil {
-		log.Fatalf("%s[APP] [ERROR] Starting server: %v%s", config.LogErrorColor, err, config.LogColorReset)
+		appLogger.Error(fmt.Sprintf("Starting server: %v", err))
+		os.Exit(1)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	i "github.com/beka-birhanu/vinom-api/service/i"
+	game_i "github.com/beka-birhanu/vinom-interfaces/game"
 	"github.com/google/uuid"
 )
 
@@ -33,22 +33,22 @@ const (
 // Game represents a maze game with players, a maze, and game state.
 // It manages player actions, broadcasts game state, and tracks game progress.
 type Game struct {
-	maze         i.Maze                 // The maze structure.
-	players      map[uuid.UUID]i.Player // Map of players indexed by their IDs.
-	version      int64                  // Game state version for synchronization.
-	encoder      i.GameEncoder          // Encoder for serializing game state.
-	stop         chan bool              // stop channel to signal stop.
-	rewardsLeft  int                    // Total rewards left in the maze.
-	stateChan    chan []byte            // Channel for broadcasting state changes.
-	actionChan   chan []byte            // Channel for broadcasting actions.
-	endChan      chan []byte            // Channel to signal game completion.
-	Wg           *sync.WaitGroup        // WaitGroup to manage concurrent goroutines.
-	sync.RWMutex                        // Read-Write lock for synchronizing access.
+	maze         game_i.Maze                 // The maze structure.
+	players      map[uuid.UUID]game_i.Player // Map of players indexed by their IDs.
+	version      int64                       // Game state version for synchronization.
+	encoder      game_i.GameEncoder          // Encoder for serializing game state.
+	stop         chan bool                   // stop channel to signal stop.
+	rewardsLeft  int                         // Total rewards left in the maze.
+	stateChan    chan []byte                 // Channel for broadcasting state changes.
+	actionChan   chan []byte                 // Channel for broadcasting actions.
+	endChan      chan []byte                 // Channel to signal game completion.
+	Wg           *sync.WaitGroup             // WaitGroup to manage concurrent goroutines.
+	sync.RWMutex                             // Read-Write lock for synchronizing access.
 }
 
 // NewGame creates a new Game instance with the specified maze, players, and encoder.
 // Returns an error if configuration constraints are violated.
-func NewGame(maze i.Maze, players []i.Player, e i.GameEncoder) (*Game, error) {
+func NewGame(maze game_i.Maze, players []game_i.Player, e game_i.GameEncoder) (*Game, error) {
 	if len(players) > maxPlayers {
 		return nil, ErrTooManyPlayers
 	}
@@ -61,7 +61,7 @@ func NewGame(maze i.Maze, players []i.Player, e i.GameEncoder) (*Game, error) {
 		return nil, ErrNotBigEnoughDimension
 	}
 
-	playersMap := make(map[uuid.UUID]i.Player)
+	playersMap := make(map[uuid.UUID]game_i.Player)
 	for _, player := range players {
 		if !maze.InBound(int(player.RetrivePos().GetRow()), int(player.RetrivePos().GetCol())) {
 			return nil, ErrInvalidPlayerPosition
@@ -147,7 +147,7 @@ func (g *Game) broadcastState(ended bool) {
 }
 
 // snapshot creates a snapshot of the current game state.
-func (g *Game) snapshot() i.GameState {
+func (g *Game) snapshot() game_i.GameState {
 	g.RLock()
 	defer g.RUnlock()
 
@@ -160,7 +160,7 @@ func (g *Game) snapshot() i.GameState {
 
 // handleIncomingMove processes player movement actions.
 // It validates the move, updates the state, and broadcasts changes.
-func (g *Game) handleIncomingMove(a i.Action) {
+func (g *Game) handleIncomingMove(a game_i.Action) {
 	g.Lock()
 	p, ok := g.players[a.GetID()]
 	if !ok {

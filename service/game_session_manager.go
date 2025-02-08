@@ -2,12 +2,14 @@ package service
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/beka-birhanu/vinom-api/config"
 	"github.com/beka-birhanu/vinom-api/service/i"
+	game_i "github.com/beka-birhanu/vinom-interfaces/game"
+	general_i "github.com/beka-birhanu/vinom-interfaces/general"
+	socket_i "github.com/beka-birhanu/vinom-interfaces/socket"
 	"github.com/google/uuid"
 )
 
@@ -27,23 +29,23 @@ var (
 )
 
 type GameSessionManager struct {
-	socket   i.ServerSocketManager
+	socket   socket_i.ServerSocketManager
 	sessions map[uuid.UUID]struct {
 		gameSession i.GameServer
 		players     []uuid.UUID
 	}
 	playerToSession map[uuid.UUID]uuid.UUID
-	mazeFactory     func(int, int) (i.Maze, error)
-	gameEndcoder    i.GameEncoder
-	logger          *log.Logger
+	mazeFactory     func(int, int) (game_i.Maze, error)
+	gameEndcoder    game_i.GameEncoder
+	logger          general_i.Logger
 	sync.RWMutex
 }
 
 type Config struct {
-	Socket       i.ServerSocketManager
-	MazeFactory  func(int, int) (i.Maze, error)
-	GameEndcoder i.GameEncoder
-	Logger       *log.Logger
+	Socket       socket_i.ServerSocketManager
+	MazeFactory  func(int, int) (game_i.Maze, error)
+	GameEndcoder game_i.GameEncoder
+	Logger       general_i.Logger
 }
 
 func NewGameSessionManager(c *Config) (*GameSessionManager, error) {
@@ -66,11 +68,11 @@ func NewGameSessionManager(c *Config) (*GameSessionManager, error) {
 
 func (g *GameSessionManager) NewSession(playerIDs []uuid.UUID) {
 	if len(playerIDs) > maxPlayers {
-		g.logger.Printf("%s[ERROR]%s too many players in game session: %d", config.LogErrorColor, config.LogColorReset, len(playerIDs))
+		g.logger.Warning(fmt.Sprintf("Too many players in game session: %d", len(playerIDs)))
 		return
 	}
 
-	players := make([]i.Player, 0)
+	players := make([]game_i.Player, 0)
 	for i, pID := range playerIDs {
 		pos := g.gameEndcoder.NewCellPosition()
 		pos.SetRow(defaultPlayerPositions[i].row)
@@ -84,7 +86,7 @@ func (g *GameSessionManager) NewSession(playerIDs []uuid.UUID) {
 
 	maze, err := g.mazeFactory(20, defaultMazeSize)
 	if err != nil {
-		g.logger.Printf("%s[ERROR]%s creating maze for a new game: %s", config.LogErrorColor, config.LogColorReset, err)
+		g.logger.Error(fmt.Sprintf("creating maze for a new game: %s", err))
 		return
 	}
 
@@ -95,20 +97,20 @@ func (g *GameSessionManager) NewSession(playerIDs []uuid.UUID) {
 	}{RewardOne: 1, RewardTwo: 5, RewardTypeProb: 0.9}
 
 	if err := maze.PopulateReward(mazeRewardModel); err != nil {
-		g.logger.Printf("%s[ERROR]%s populating rewards for a new game: %s", config.LogErrorColor, config.LogColorReset, err)
+		g.logger.Error(fmt.Sprintf("populating rewards for a new game: %s", err))
 		return
 	}
 
 	gameServer, err := NewGame(maze, players, g.gameEndcoder)
 	if err != nil {
-		g.logger.Printf("%s[ERROR]%s creating new game server: %s", config.LogErrorColor, config.LogColorReset, err)
+		g.logger.Error(fmt.Sprintf("creating new game server: %s", err))
 		return
 	}
 
 	sessionID := g.saveSession(playerIDs, gameServer)
 	go gameServer.Start(defaultGameDuration)
 	go g.listenGameChan(sessionID)
-	g.logger.Printf("%s[INFO]%s started new game for players: %v", config.LogInfoColor, config.LogColorReset, playerIDs)
+	g.logger.Info(fmt.Sprintf("started new game for players: %v", playerIDs))
 }
 
 func (g *GameSessionManager) SessionInfo(playerID uuid.UUID) ([]byte, string, error) {
@@ -125,16 +127,14 @@ func (g *GameSessionManager) Authenticate(s []byte) (uuid.UUID, error) {
 	defer g.RUnlock()
 	id, err := uuid.FromBytes(s)
 	if err != nil {
-		g.logger.Printf("%s[ERROR]%s invalid token provided", config.LogErrorColor, config.LogColorReset)
 		return uuid.Nil, errors.New("invalid token")
 	}
 
 	if _, ok := g.playerToSession[id]; !ok {
-		g.logger.Printf("%s[ERROR]%s player does not have a game session", config.LogErrorColor, config.LogColorReset)
 		return uuid.Nil, errors.New("player does not have game session")
 	}
 
-	g.logger.Printf("%s[INFO]%s authenticated player: %s", config.LogInfoColor, config.LogColorReset, id)
+	g.logger.Info(fmt.Sprintf("authenticated player: %s", id))
 	return id, nil
 }
 
@@ -184,13 +184,13 @@ func (g *GameSessionManager) writePlayerRequest(pID uuid.UUID, actionType byte, 
 	defer g.RUnlock()
 	sessionID, ok := g.playerToSession[pID]
 	if !ok {
-		g.logger.Printf("%s[ERROR]%s received request for player without session", config.LogErrorColor, config.LogColorReset)
+		g.logger.Warning("received request for player without session")
 		return
 	}
 
 	gameServer := g.sessions[sessionID].gameSession
 	gameServer.ActionChan() <- append([]byte{actionType}, payload...)
-	g.logger.Printf("%s[INFO]%s processed request for player: %s", config.LogInfoColor, config.LogColorReset, pID)
+	g.logger.Info(fmt.Sprintf("processed request for player: %s", pID))
 }
 
 func (g *GameSessionManager) clean(ID uuid.UUID) {
