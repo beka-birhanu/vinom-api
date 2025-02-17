@@ -20,7 +20,7 @@ type Logger struct {
 }
 
 func New(prefix, prefixColor string, writter io.Writer) (general_i.Logger, error) {
-	logger := log.New(writter, fmt.Sprintf("\n%s[%s] %s", prefixColor, prefix, colorReset), log.LstdFlags|log.Lmsgprefix)
+	logger := log.New(writter, fmt.Sprintf("%s[%s] %s", prefixColor, prefix, colorReset), log.LstdFlags|log.Lmsgprefix)
 	return &Logger{
 		logger: logger,
 	}, nil
