@@ -20,7 +20,6 @@ type MatchMakingController struct {
 
 // NewMatchMakingController initializes a MatchMakingController.
 func NewMatchMakingController(gsm i.GameSessionManager, ur i.UserRepo, ms i.Matchmaker) (*MatchMakingController, error) {
-	ms.SetMatchHandler(gsm.NewSession)
 	return &MatchMakingController{
 		gameSessionManager: gsm,
 		userRepo:           ur,
@@ -76,7 +75,9 @@ func (mkc *MatchMakingController) matchInfo(ctx *gin.Context) {
 		return
 	}
 
-	pubKey, socketAddr, err := mkc.gameSessionManager.SessionInfo(ID)
+	timeoutCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	pubKey, socketAddr, err := mkc.gameSessionManager.SessionInfo(timeoutCtx, ID)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "No Session"})
 		return
