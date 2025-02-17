@@ -18,7 +18,7 @@ genpb:
 	@echo "Generating Go code from .proto files..."
 	@for dir in $(PROTO_DIRS); do \
 		echo "Processing directory: $$dir"; \
-		protoc -I $$dir --go_out=$$dir $$dir/*.proto; \
+		protoc -I $$dir --go_out=$$dir $$dir/*.proto  --go-grpc_out=$$dir; \
 	done
 	@echo "Protobuf generation complete!"
 
