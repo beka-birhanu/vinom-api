@@ -15,8 +15,10 @@ type Config struct {
 	DBUser                 string // Username for the database
 	DBPassword             string // Password for the database
 	DBName                 string // Name of the database
-	RedisHost              string // Hostname or IP address for the Redis server
-	RedisPort              int    // Port number for the Redis server
+	MatchmakingHost        string // Hostname or IP address for the Matchmaiking server
+	MatchmakingPort        int    // Port number for the Matchmaiking server
+	SessionManagerHost     string // Hostname or IP address for the session manager server
+	SessionManagerPort     int    // Port number for the session manager server
 	GinMode                string // Mode for the Gin framework (e.g., release, debug, test)
 	UDPBufferSize          int    // Size of the buffer for incoming UDP packets (in bytes)
 	UDPHeartbeatExpiration int    // Expiration time for UDP heartbeat (in milliseconds)
@@ -48,8 +50,10 @@ func initConfig() Config {
 		DBUser:                 mustGetEnv("DB_USER"),
 		DBPassword:             mustGetEnv("DB_PASS"),
 		DBName:                 mustGetEnv("DB_NAME"),
-		RedisHost:              mustGetEnv("REDIS_HOST"),
-		RedisPort:              mustGetEnvAsInt("REDIS_PORT"),
+		MatchmakingHost:        mustGetEnv("MATCHMAKING_HOST"),
+		MatchmakingPort:        mustGetEnvAsInt("MATCHMAKING_PORT"),
+		SessionManagerHost:     mustGetEnv("SESSION_HOST"),
+		SessionManagerPort:     mustGetEnvAsInt("SESSION_PORT"),
 		GinMode:                getEnvWithDefault("GIN_MODE", "release"),
 		UDPBufferSize:          mustGetEnvAsInt("UDP_BUFFER_SIZE"),
 		UDPHeartbeatExpiration: mustGetEnvAsInt("UDP_HEARTBEAT_EXPIRATION"),

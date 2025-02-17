@@ -7,6 +7,5 @@ import (
 )
 
 type Matchmaker interface {
-	PushToQueue(ctx context.Context, id uuid.UUID, rating int, latency uint) error
-	SetMatchHandler(func([]uuid.UUID))
+	Match(ctx context.Context, id uuid.UUID, rating int, latency uint) error
 }

@@ -56,7 +56,9 @@ func (mkc *MatchMakingController) match(ctx *gin.Context) {
 		return
 	}
 
-	err = mkc.matchingService.PushToQueue(context.Background(), user.ID, user.Rating, uint(latency))
+	timeoutCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	err = mkc.matchingService.Match(timeoutCtx, user.ID, user.Rating, uint(latency))
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "error while matching player"})
 		return
