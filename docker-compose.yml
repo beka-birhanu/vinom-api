@@ -1,17 +1,4 @@
 services:
-  redis:
-    image: redis:7.4
-    container_name: vinom_redis
-    command: ["redis-server", "--appendonly", "no"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "-h", "localhost", "--raw", "PING"]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    networks:
-      - redis_network
-
   db:
     image: mongo:8.0
     container_name: vinom_db
@@ -37,40 +24,31 @@ services:
     container_name: vinom_app
     ports:
       - "${REST_PORT}:${REST_PORT}"
-      - "${UDP_PORT}:${UDP_PORT}/udp"
     volumes:
       - .:/app
       - /app/tmp 
     environment:
       HOST_IP: app
+      REST_PORT: ${REST_PORT}
       DB_HOST: ${DB_HOST}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
       DB_PORT: ${DB_PORT}
       DB_NAME: ${DB_NAME}
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT}
+      MATCHMAKING_HOST: ${MATCHMAKING_HOST}
+      MATCHMAKING_PORT: ${MATCHMAKING_PORT}
+      SESSION_PORT: ${SESSION_PORT}
+      SESSION_HOST: ${SESSION_HOST}
       GIN_MODE: ${GIN_MODE}
-      UDP_PORT: ${UDP_PORT}
-      UDP_BUFFER_SIZE: ${UDP_BUFFER_SIZE}
       JWT_SECRET: ${JWT_SECRET}
       JWT_ISSUER: ${JWT_ISSUER}
-      REST_PORT: ${REST_PORT}
-      MAX_PLAYER: ${MAX_PLAYER}
-      RANK_TOLERANCE: ${RANK_TOLERANCE}
-      LATENCY_TOLERANCE: ${LATENCY_TOLERANCE}
     networks:
-      - redis_network
       - db_network 
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
 
 networks:
-  redis_network:
-    driver: bridge
   db_network:
     driver: bridge
 
