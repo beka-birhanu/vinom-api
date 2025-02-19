@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/beka-birhanu/vinom-api/service/i"
-	general_i "github.com/beka-birhanu/vinom-interfaces/general"
+	general_i "github.com/beka-birhanu/vinom-common/interfaces/general"
 	"github.com/google/uuid"
 	grpc "google.golang.org/grpc"
 )

@@ -13,12 +13,12 @@ import (
 	"github.com/beka-birhanu/vinom-api/config"
 	grpc_matchmaking "github.com/beka-birhanu/vinom-api/infrastruture/grpc/matchmaking"
 	grpc_sessionmanager "github.com/beka-birhanu/vinom-api/infrastruture/grpc/sessionmanager"
-	logger "github.com/beka-birhanu/vinom-api/infrastruture/log"
 	"github.com/beka-birhanu/vinom-api/infrastruture/repo"
 	"github.com/beka-birhanu/vinom-api/infrastruture/token"
 	"github.com/beka-birhanu/vinom-api/service"
 	"github.com/beka-birhanu/vinom-api/service/i"
-	general_i "github.com/beka-birhanu/vinom-interfaces/general"
+	general_i "github.com/beka-birhanu/vinom-common/interfaces/general"
+	logger "github.com/beka-birhanu/vinom-common/log"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
@@ -65,9 +65,8 @@ func initUserRepo(client *mongo.Client) {
 
 func initGrpcConns() {
 	var err error
-	addr := fmt.Sprintf("%s:%d", config.Envs.MatchmakingHost, config.Envs.MatchmakingPort)
-	matchmakerGrpcConn, err = grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
+	matchmakingAddr := fmt.Sprintf("%s:%d", config.Envs.MatchmakingHost, config.Envs.MatchmakingPort)
+	matchmakerGrpcConn, err = grpc.NewClient(matchmakingAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		appLogger.Error(fmt.Sprintf("Creating matchmaing gRPC connection : %v", err))
 		os.Exit(1)
@@ -75,8 +74,8 @@ func initGrpcConns() {
 
 	appLogger.Info("Created matchmaing gRPC connection")
 
-	addr = fmt.Sprintf("%s:%d", config.Envs.SessionManagerHost, config.Envs.SessionManagerPort)
-	sessionManagerGrpcConn, err = grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	sessionmanagerAddr := fmt.Sprintf("%s:%d", config.Envs.SessionManagerHost, config.Envs.SessionManagerPort)
+	sessionManagerGrpcConn, err = grpc.NewClient(sessionmanagerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		appLogger.Error(fmt.Sprintf("Creating session manager gRPC connection : %v", err))
 		os.Exit(1)
@@ -108,7 +107,7 @@ func initMatchmaker() {
 		os.Exit(1)
 	}
 
-	matchmaker, err = grpc_matchmaking.NewClient(sessionManagerGrpcConn, matchLogger)
+	matchmaker, err = grpc_matchmaking.NewClient(matchmakerGrpcConn, matchLogger)
 	if err != nil {
 		appLogger.Error(fmt.Sprintf("Creating grpc matchmaker client: %v", err))
 		os.Exit(1)
