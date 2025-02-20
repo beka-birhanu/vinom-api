@@ -93,11 +93,11 @@ func initSessionManager() {
 
 	gameSessionManager, err = grpc_sessionmanager.NewClient(sessionManagerGrpcConn, sessionLogger)
 	if err != nil {
-		appLogger.Error(fmt.Sprintf("Creating grpc matchmaker client: %v", err))
+		appLogger.Error(fmt.Sprintf("Creating grpc session client: %v", err))
 		os.Exit(1)
 	}
 
-	appLogger.Info("Matchmaker initialized")
+	appLogger.Info("Session manager initialized")
 }
 
 func initMatchmaker() {
@@ -143,7 +143,7 @@ func initAuthService() {
 
 func initAuthController() {
 	authController = identity.NewIdentityServer(authService)
-	appLogger.Info("Auth controller initialized initialized")
+	appLogger.Info("Auth controller initialized")
 }
 
 func initRouter(t i.Tokenizer) {
