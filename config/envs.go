@@ -17,13 +17,14 @@ type Config struct {
 	DBUser             string // Username for the database
 	DBPassword         string // Password for the database
 	DBName             string // Name of the database
+	GinMode            string // Mode for the Gin framework (e.g., release, debug, test)
+	JWTSecret          string // Secret key for JWT signing
+	JWTIssuer          string // Issuer claim for JWTs
 	MatchmakingHost    string // Hostname or IP address for the Matchmaiking server
 	MatchmakingPort    int    // Port number for the Matchmaiking server
 	SessionManagerHost string // Hostname or IP address for the session manager server
 	SessionManagerPort int    // Port number for the session manager server
-	GinMode            string // Mode for the Gin framework (e.g., release, debug, test)
-	JWTSecret          string // Secret key for JWT signing
-	JWTIssuer          string // Issuer claim for JWTs
+	RPCTimeout         int    // Timeout duration for rpc calles
 }
 
 // Envs holds the application's configuration loaded from environment variables.
@@ -48,6 +49,7 @@ func initConfig() Config {
 		MatchmakingPort:    mustGetEnvAsInt("MATCHMAKING_PORT"),
 		SessionManagerHost: mustGetEnv("SESSION_HOST"),
 		SessionManagerPort: mustGetEnvAsInt("SESSION_PORT"),
+		RPCTimeout:         mustGetEnvAsInt("RPC_TIMEOUT"),
 		GinMode:            getEnvWithDefault("GIN_MODE", "release"),
 		JWTSecret:          mustGetEnv("JWT_SECRET"),
 		JWTIssuer:          mustGetEnv("JWT_ISSUER"),

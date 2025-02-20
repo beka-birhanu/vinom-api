@@ -91,7 +91,7 @@ func initSessionManager() {
 		os.Exit(1)
 	}
 
-	gameSessionManager, err = grpc_sessionmanager.NewClient(sessionManagerGrpcConn, sessionLogger)
+	gameSessionManager, err = grpc_sessionmanager.NewClient(sessionManagerGrpcConn, sessionLogger, time.Duration(config.Envs.RPCTimeout)*time.Millisecond)
 	if err != nil {
 		appLogger.Error(fmt.Sprintf("Creating grpc session client: %v", err))
 		os.Exit(1)
@@ -107,7 +107,7 @@ func initMatchmaker() {
 		os.Exit(1)
 	}
 
-	matchmaker, err = grpc_matchmaking.NewClient(matchmakerGrpcConn, matchLogger)
+	matchmaker, err = grpc_matchmaking.NewClient(matchmakerGrpcConn, matchLogger, time.Duration(config.Envs.RPCTimeout)*time.Millisecond)
 	if err != nil {
 		appLogger.Error(fmt.Sprintf("Creating grpc matchmaker client: %v", err))
 		os.Exit(1)

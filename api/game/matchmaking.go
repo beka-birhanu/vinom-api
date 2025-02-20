@@ -2,7 +2,6 @@
 package gameapi
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -56,9 +55,7 @@ func (mkc *MatchMakingController) match(ctx *gin.Context) {
 		return
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-	defer cancel()
-	err = mkc.matchingService.Match(timeoutCtx, user.ID, user.Rating, uint(latency))
+	err = mkc.matchingService.Match(ctx, user.ID, user.Rating, uint(latency))
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "error while matching player"})
 		return
@@ -77,9 +74,7 @@ func (mkc *MatchMakingController) matchInfo(ctx *gin.Context) {
 		return
 	}
 
-	timeoutCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-	defer cancel()
-	pubKey, socketAddr, err := mkc.gameSessionManager.SessionInfo(timeoutCtx, ID)
+	pubKey, socketAddr, err := mkc.gameSessionManager.SessionInfo(ctx, ID)
 	if err != nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "No Session"})
 		return
