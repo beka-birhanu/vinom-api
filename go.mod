@@ -3,7 +3,7 @@ module github.com/beka-birhanu/vinom-api
 go 1.24.0
 
 require (
-	github.com/beka-birhanu/vinom-common v0.0.0-20250219120723-29393b8d60dc
+	github.com/beka-birhanu/vinom-common v0.0.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-gonic/gin v1.10.0
 	github.com/google/uuid v1.6.0
@@ -17,7 +17,6 @@ require (
 )
 
 require (
-	github.com/beka-birhanu/vinom-interfaces v0.0.0-20250208062558-5610abbec85d // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
